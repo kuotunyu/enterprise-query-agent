@@ -4,6 +4,10 @@
 
 ### v1 後續本機補丁：Windows 帳本讀寫互斥
 
+2026-09-15收尾：獨立審核通過後，從乾淨工作區核對remote無新變更，將`bff01ea68fd5cd946da11ff4b5dd609b610e3b21`正常快進合併main並推送；`fix/windows-ledger-reader-lock`與舊工程分支保留。[該版本GitHub CI](https://github.com/kuotunyu/enterprise-query-agent/actions/runs/34885352292)offline／mysql均success。以下本機待核對紀錄屬先前階段，目前補丁已整合並套用；没有新增或修改tag/release。
+
+本案8010舊服務在無活動TCP請求、無未結算reservation時才停止，以隱藏背景程序重啟；新listener PID39672，啟動時記錄載入`bff01ea`，已驗證`CostLedger._read`取鎖、writer使用`_read_locked`，來源檔SHA-256為`3dbec8f81cd0d4ad0ac9e59657d1c77fcc1536a0df5686284e4538539a659d27`。`/api/meta`確認openai與`olist-local-969f3ae180928f54`，runtime與development帳本設定保留。程序內版本紀錄私存`.local/workbench-loaded-version.json`；僅執行健康／版本檢查，沒有POST模型查詢。重啟前後成本帳本SHA-256完全相同，舊研究inputs與v1.0.0目標未變。此後若main只有本文收尾更新，不需為文件變更重啟服務。
+
 2026-09-14，從乾淨的`408c036`建立`fix/windows-ledger-reader-lock`，限縮處理已有Windows並發帳本失敗，不追加模型呼叫或研究。此補丁是新的候選版本，不是原正式評估的凍結候選；原192結果、gold/scorer、報告、成本帳本及v1.0.0 tag均不修改，尚未push、合併或發布新版。
 
 - 根因已決定性重現：`__init__`／`total`／`records`的`_read`未參與writer lock。測試以Event固定交錯，保持真實`rb`檔案handle開啟，再執行writer原子替換；三條讀取路徑都在`os.replace`重現WinError5。反向交錯也證實writer持鎖時reader仍能開檔。修補前新增6例全失敗，沒有依賴sleep或反覆重跑碰運氣。
