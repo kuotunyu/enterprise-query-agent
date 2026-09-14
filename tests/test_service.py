@@ -40,7 +40,11 @@ def test_concurrent_deduplication_and_id_conflict():
         s=Service(FakeExecutor)
         r=req('2018年7月GMV')
         a,b=await asyncio.gather(s.ask(r),s.ask(r))
-        assert a==b and a.status=='answered'
+        # Each waiter is stamped on return; wall time is not a cached result.
+        exclude={'usage': {'wall_seconds'}}
+        assert a.model_dump(exclude=exclude)==b.model_dump(exclude=exclude)
+        assert a.status=='answered'
+        assert a.usage['wall_seconds']>=0 and b.usage['wall_seconds']>=0
         assert FakeExecutor.executions==1 and a.usage['model_calls']==1
         r.question='2018年6月GMV'
         assert (await s.ask(r)).status=='rejected'
