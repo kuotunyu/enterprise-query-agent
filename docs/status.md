@@ -2,7 +2,9 @@
 
 ## 當前步驟
 
-2026-09-14：**第一至三步完成，使用者已批准第四步公開發布，正在執行。** 一次性 `formal-001` 完整結束，候選與評估材料無漂移。發布目標kuotunyu/enterprise-query-agent，名稱再次確認不存在；發布前114項離線測試通過（3.37秒），41 deselected、1原有warning。未進行雲端部署。
+2026-09-14：**v1本機交付、一次正式比較與公開原始碼發布完成，release收尾中。** 使用者已批准發布，[kuotunyu/enterprise-query-agent](https://github.com/kuotunyu/enterprise-query-agent)已建立為public，main推送成功，實作提交`3f7b435`。發布前114項離線測試通過（3.37秒），41 deselected、1原有warning。未進行雲端部署。
+
+Git發布的31份候選來源與凍結來源逐檔核對，僅12份CRLF→LF換行正規化，沒有邏輯變動；對照見 [publication-provenance.json](../reports/publication-provenance.json)。舊工程分支及本機完整研究材料保留，原始CSV、憑證與provider traces未推送。下方「未發布／待授權」敘述為先前階段紀錄，以本段為準。
 
 ### 正式評估完成
 

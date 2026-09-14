@@ -1,6 +1,6 @@
-# v1 發布內容草稿
+# v1.0.0 發布說明
 
-目標：`kuotunyu/enterprise-query-agent`。目前只有本機可審查材料，沒有建立遠端repo或release；發布當下再次確認名稱可用。
+原始碼：[kuotunyu/enterprise-query-agent](https://github.com/kuotunyu/enterprise-query-agent)。本次發布本機產品原始碼與評估摘要，不包含雲端託管服務。
 
 中文Olist歷史資料工作台，具營收口徑澄清、受控SQL、唯讀MySQL、Decimal數值與查詢證據。提供可重建的合成示例；實際Olist CSV由使用者另行取得，不隨原始碼散布。真模型採GPT-5.6 Luna，另有不呼叫API的mock模式。
 

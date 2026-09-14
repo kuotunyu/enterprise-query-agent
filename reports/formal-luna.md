@@ -2,7 +2,7 @@
 
 2026-09-14，`formal-001` 完成。**40 原題的嚴格契約成功數：A 30、B 23、C 31。** C 比 A 多一題；這個小型、同領域、同模型研究不能證明一般性優勢。共通支援子集反而以固定模板 A 最穩定。
 
-完整機器可讀摘要：[formal-luna.json](formal-luna.json)。三輪公開開發結果：[development-luna.json](development-luna.json)。操作展示：[demo.md](../docs/demo.md)。以下為本機實測，尚未發布遠端版本。
+完整機器可讀摘要：[formal-luna.json](formal-luna.json)。三輪公開開發結果：[development-luna.json](development-luna.json)。操作展示：[demo.md](../docs/demo.md)。以下為本機實測；發布來源的換行正規化雜湊對照見 [publication-provenance.json](publication-provenance.json)，不改寫原研究雜湊。
 
 ## 設計與完整性
 

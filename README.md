@@ -2,7 +2,7 @@
 
 以中文詢問歷史 Olist 電商資料，先確認業務口徑，再執行受控 SQL，呈現可核對的 BRL 數字、結果表與證據。
 
-本機工作台已接入真實 Olist 歷史資料與 GPT-5.6 Luna，開發驗證與一次正式比較均已完成。40原題嚴格契約成功數為 A固定模板30、B直接SQL23、C業務計畫31；另有24個相依變體。C僅比A多一題，不能推論一般性優勢，共通支援子集以A較穩定。完整結果與評分限制見 [正式報告](reports/formal-luna.md)，工程紀錄見 [工程狀態](docs/status.md)。尚未發布GitHub repository或release。
+本機工作台已接入真實 Olist 歷史資料與 GPT-5.6 Luna，開發驗證與一次正式比較均已完成。40原題嚴格契約成功數為 A固定模板30、B直接SQL23、C業務計畫31；另有24個相依變體。C僅比A多一題，不能推論一般性優勢，共通支援子集以A較穩定。完整結果與評分限制見 [正式報告](reports/formal-luna.md)，工程紀錄見 [工程狀態](docs/status.md)。原始碼已公開於 [kuotunyu/enterprise-query-agent](https://github.com/kuotunyu/enterprise-query-agent)；工作台仍在本機執行。
 
 **開發請只從 [施工總計畫](PROJECT_PLAN.md) 開始。** 它統一目前進度、下一步、驗收與結案條件；其他設計文件按需查閱。
 
