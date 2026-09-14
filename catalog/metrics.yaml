@@ -1,0 +1,16 @@
+version: v1
+currency: BRL
+datetime: source local DATETIME; no timezone conversion
+coverage_policy:
+  start: '2017-01-01'
+  end_exclusive: '2018-09-01'
+  attribution: Source analysis policy; not independent completeness proof
+metrics:
+  gmv: {grain: item, population: delivered, definition: 商品金額＋運費, time: order_purchase_timestamp, null: preserve, dimensions: [month, state, order, seller, category]}
+  merchandise_value: {grain: item, population: delivered, definition: 商品金額、不含運費, time: order_purchase_timestamp, null: preserve, dimensions: [month, state, order, seller, category]}
+  payment_value: {grain: payment, population: all statuses, definition: 全部狀態付款列總額、不是會計已實現營收, time: order_purchase_timestamp, null: preserve, dimensions: [month, state, order]}
+  delivered_order_count: {grain: distinct order, population: delivered, definition: delivered 不重複訂單數, time: order_purchase_timestamp, null: zero, dimensions: [month, state, order, seller, category]}
+  aov: {grain: distinct order, population: delivered, definition: GMV／同一 population 的不重複訂單數, denominator: distinct order_id, time: order_purchase_timestamp, null: undefined when denominator zero, dimensions: [month, state, order, seller, category]}
+  late_rate: {grain: order, population: delivered, definition: 實際送達晚於預估送達的比例, denominator: both delivery dates present, missing: excluded and counted, time: order_purchase_timestamp, dimensions: [month, state, order]}
+  repeat_customer_rate: {grain: customer_unique_id, population: delivered within requested period, definition: 期間至少兩單自然人／期間至少一單自然人, denominator: customer_unique_id with at least one delivered order, time: order_purchase_timestamp, null: undefined when denominator zero, dimensions: []}
+  average_review_score: {grain: latest review per order, population: delivered, definition: 每訂單最新評分平均，依creation、answer、review_id倒序, denominator: valid scores, missing: excluded and counted, time: order_purchase_timestamp, dimensions: [month, state, order]}

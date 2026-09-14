@@ -1,0 +1,10 @@
+.venv/
+.local/
+.env
+__pycache__/
+.pytest_cache/
+*.egg-info/
+data/raw/
+*.pyc
+test-results/
+playwright-report/

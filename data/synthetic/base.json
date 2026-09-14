@@ -1,0 +1,285 @@
+{
+  "product_category_name_translation": [
+    {
+      "product_category_name": "A",
+      "product_category_name_english": "A"
+    },
+    {
+      "product_category_name": "B",
+      "product_category_name_english": "B"
+    }
+  ],
+  "customers": [
+    {
+      "customer_id": "00000000000000000000000000000065",
+      "customer_unique_id": "000000000000000000000000000000c9",
+      "customer_zip_code_prefix": "01000",
+      "customer_city": "Sao Paulo",
+      "customer_state": "SP"
+    },
+    {
+      "customer_id": "00000000000000000000000000000066",
+      "customer_unique_id": "000000000000000000000000000000c9",
+      "customer_zip_code_prefix": "01000",
+      "customer_city": "Sao Paulo",
+      "customer_state": "SP"
+    },
+    {
+      "customer_id": "00000000000000000000000000000067",
+      "customer_unique_id": "000000000000000000000000000000ca",
+      "customer_zip_code_prefix": "01000",
+      "customer_city": "Sao Paulo",
+      "customer_state": "SP"
+    },
+    {
+      "customer_id": "00000000000000000000000000000068",
+      "customer_unique_id": "000000000000000000000000000000cb",
+      "customer_zip_code_prefix": "02000",
+      "customer_city": "Rio",
+      "customer_state": "RJ"
+    },
+    {
+      "customer_id": "00000000000000000000000000000069",
+      "customer_unique_id": "000000000000000000000000000000cc",
+      "customer_zip_code_prefix": "01000",
+      "customer_city": "Sao Paulo",
+      "customer_state": "SP"
+    }
+  ],
+  "sellers": [
+    {
+      "seller_id": "0000000000000000000000000000012d",
+      "seller_zip_code_prefix": "01000",
+      "seller_city": "Sao Paulo",
+      "seller_state": "SP"
+    }
+  ],
+  "geolocation": [
+    {
+      "geolocation_zip_code_prefix": "01000",
+      "geolocation_lat": "-23.5",
+      "geolocation_lng": "-46.6",
+      "geolocation_city": "Sao Paulo",
+      "geolocation_state": "SP"
+    },
+    {
+      "geolocation_zip_code_prefix": "01000",
+      "geolocation_lat": "-23.6",
+      "geolocation_lng": "-46.7",
+      "geolocation_city": "Sao Paulo",
+      "geolocation_state": "SP"
+    },
+    {
+      "geolocation_zip_code_prefix": "02000",
+      "geolocation_lat": "-22.9",
+      "geolocation_lng": "-43.2",
+      "geolocation_city": "Rio",
+      "geolocation_state": "RJ"
+    }
+  ],
+  "products": [
+    {
+      "product_id": "00000000000000000000000000000191",
+      "product_category_name": "A",
+      "product_name_length": 1,
+      "product_description_length": 1,
+      "product_photos_qty": 1,
+      "product_weight_g": 100,
+      "product_length_cm": 1,
+      "product_height_cm": 1,
+      "product_width_cm": 1
+    },
+    {
+      "product_id": "00000000000000000000000000000192",
+      "product_category_name": "B",
+      "product_name_length": 1,
+      "product_description_length": 1,
+      "product_photos_qty": 1,
+      "product_weight_g": 100,
+      "product_length_cm": 1,
+      "product_height_cm": 1,
+      "product_width_cm": 1
+    }
+  ],
+  "orders": [
+    {
+      "order_id": "00000000000000000000000000000001",
+      "customer_id": "00000000000000000000000000000065",
+      "order_status": "delivered",
+      "order_purchase_timestamp": "2018-07-10 12:00:00",
+      "order_approved_at": "2018-07-10 12:00:00",
+      "order_delivered_carrier_date": null,
+      "order_delivered_customer_date": "2018-07-16 12:00:00",
+      "order_estimated_delivery_date": "2018-07-15 12:00:00"
+    },
+    {
+      "order_id": "00000000000000000000000000000002",
+      "customer_id": "00000000000000000000000000000066",
+      "order_status": "delivered",
+      "order_purchase_timestamp": "2018-07-20 12:00:00",
+      "order_approved_at": "2018-07-20 12:00:00",
+      "order_delivered_carrier_date": null,
+      "order_delivered_customer_date": "2018-07-25 12:00:00",
+      "order_estimated_delivery_date": "2018-07-25 12:00:00"
+    },
+    {
+      "order_id": "00000000000000000000000000000003",
+      "customer_id": "00000000000000000000000000000067",
+      "order_status": "canceled",
+      "order_purchase_timestamp": "2018-07-21 12:00:00",
+      "order_approved_at": "2018-07-21 12:00:00",
+      "order_delivered_carrier_date": null,
+      "order_delivered_customer_date": null,
+      "order_estimated_delivery_date": "2018-07-26 12:00:00"
+    },
+    {
+      "order_id": "00000000000000000000000000000004",
+      "customer_id": "00000000000000000000000000000068",
+      "order_status": "delivered",
+      "order_purchase_timestamp": "2018-07-22 12:00:00",
+      "order_approved_at": "2018-07-22 12:00:00",
+      "order_delivered_carrier_date": null,
+      "order_delivered_customer_date": null,
+      "order_estimated_delivery_date": "2018-07-27 12:00:00"
+    },
+    {
+      "order_id": "00000000000000000000000000000005",
+      "customer_id": "00000000000000000000000000000069",
+      "order_status": "delivered",
+      "order_purchase_timestamp": "2018-06-10 12:00:00",
+      "order_approved_at": "2018-06-10 12:00:00",
+      "order_delivered_carrier_date": null,
+      "order_delivered_customer_date": "2018-06-15 12:00:00",
+      "order_estimated_delivery_date": "2018-06-15 12:00:00"
+    }
+  ],
+  "order_items": [
+    {
+      "order_id": "00000000000000000000000000000001",
+      "order_item_id": 1,
+      "product_id": "00000000000000000000000000000191",
+      "seller_id": "0000000000000000000000000000012d",
+      "shipping_limit_date": "2018-07-30 12:00:00",
+      "price": "100",
+      "freight_value": "10"
+    },
+    {
+      "order_id": "00000000000000000000000000000001",
+      "order_item_id": 2,
+      "product_id": "00000000000000000000000000000192",
+      "seller_id": "0000000000000000000000000000012d",
+      "shipping_limit_date": "2018-07-30 12:00:00",
+      "price": "50",
+      "freight_value": "5"
+    },
+    {
+      "order_id": "00000000000000000000000000000002",
+      "order_item_id": 1,
+      "product_id": "00000000000000000000000000000191",
+      "seller_id": "0000000000000000000000000000012d",
+      "shipping_limit_date": "2018-07-30 12:00:00",
+      "price": "40",
+      "freight_value": "4"
+    },
+    {
+      "order_id": "00000000000000000000000000000003",
+      "order_item_id": 1,
+      "product_id": "00000000000000000000000000000191",
+      "seller_id": "0000000000000000000000000000012d",
+      "shipping_limit_date": "2018-07-30 12:00:00",
+      "price": "200",
+      "freight_value": "20"
+    },
+    {
+      "order_id": "00000000000000000000000000000004",
+      "order_item_id": 1,
+      "product_id": "00000000000000000000000000000192",
+      "seller_id": "0000000000000000000000000000012d",
+      "shipping_limit_date": "2018-07-30 12:00:00",
+      "price": "30",
+      "freight_value": "3"
+    },
+    {
+      "order_id": "00000000000000000000000000000005",
+      "order_item_id": 1,
+      "product_id": "00000000000000000000000000000191",
+      "seller_id": "0000000000000000000000000000012d",
+      "shipping_limit_date": "2018-07-30 12:00:00",
+      "price": "100",
+      "freight_value": "10"
+    }
+  ],
+  "order_payments": [
+    {
+      "order_id": "00000000000000000000000000000001",
+      "payment_sequential": 1,
+      "payment_type": "credit_card",
+      "payment_installments": 1,
+      "payment_value": "100"
+    },
+    {
+      "order_id": "00000000000000000000000000000001",
+      "payment_sequential": 2,
+      "payment_type": "credit_card",
+      "payment_installments": 1,
+      "payment_value": "65"
+    },
+    {
+      "order_id": "00000000000000000000000000000002",
+      "payment_sequential": 1,
+      "payment_type": "credit_card",
+      "payment_installments": 1,
+      "payment_value": "44"
+    },
+    {
+      "order_id": "00000000000000000000000000000003",
+      "payment_sequential": 1,
+      "payment_type": "credit_card",
+      "payment_installments": 1,
+      "payment_value": "220"
+    },
+    {
+      "order_id": "00000000000000000000000000000004",
+      "payment_sequential": 1,
+      "payment_type": "credit_card",
+      "payment_installments": 1,
+      "payment_value": "30"
+    },
+    {
+      "order_id": "00000000000000000000000000000005",
+      "payment_sequential": 1,
+      "payment_type": "credit_card",
+      "payment_installments": 1,
+      "payment_value": "110"
+    }
+  ],
+  "order_reviews": [
+    {
+      "review_id": "000000000000000000000000000001f5",
+      "order_id": "00000000000000000000000000000001",
+      "review_score": 1,
+      "review_comment_title": null,
+      "review_comment_message": null,
+      "review_creation_date": "2018-07-17 12:00:00",
+      "review_answer_timestamp": "2018-07-17 13:00:00"
+    },
+    {
+      "review_id": "000000000000000000000000000001f6",
+      "order_id": "00000000000000000000000000000001",
+      "review_score": 5,
+      "review_comment_title": null,
+      "review_comment_message": null,
+      "review_creation_date": "2018-07-18 12:00:00",
+      "review_answer_timestamp": "2018-07-18 13:00:00"
+    },
+    {
+      "review_id": "000000000000000000000000000001f7",
+      "order_id": "00000000000000000000000000000002",
+      "review_score": 3,
+      "review_comment_title": null,
+      "review_comment_message": null,
+      "review_creation_date": "2018-07-26 12:00:00",
+      "review_answer_timestamp": "2018-07-26 13:00:00"
+    }
+  ]
+}

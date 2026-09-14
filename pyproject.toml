@@ -1,0 +1,20 @@
+[project]
+name = "enterprise-query-agent"
+version = "0.1.0"
+description = "Controlled Olist semantic queries with traceable facts"
+requires-python = ">=3.12,<3.13"
+dependencies = ["fastapi", "uvicorn", "pydantic", "pymysql[rsa]", "sqlglot", "pyyaml", "openai", "python-dotenv"]
+
+[dependency-groups]
+dev = ["pytest", "httpx", "playwright"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/enterprise_query"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: requires isolated MySQL", "ui: requires running web app and browser"]

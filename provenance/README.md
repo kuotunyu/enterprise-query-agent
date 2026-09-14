@@ -1,0 +1,7 @@
+# Source and fixture provenance
+
+Schema adapted from kuotunyu/mysql-ecommerce-analytics at commit 619ad706c35951bd6b811ac56765d6ad097ddbaa. Source MIT license is preserved in UPSTREAM_LICENSE; exact reviewed file SHA-256 values are in source-manifest.json. The adapted schema removes the upstream destructive bootstrap commands. Views retain upstream GMV/latest-review semantics and omit free review text from runtime access.
+
+Nine CSV sources map to product_category_name_translation, customers, sellers, geolocation, products, orders, order_items, order_payments, order_reviews. geolocation_zip is a derived tenth table; v_order_gmv and v_order_review are views. No real source CSV is distributed here. Original dataset: Olist Brazilian E-Commerce Public Dataset on Kaggle; consult its current dataset license before redistribution. This repository's fixture is independently constructed from the public development acceptance cases, not extracted from real customers.
+
+ETL v1 preserves source decimal strings, trims values, converts empty strings to NULL, keeps five-character ZIP prefixes, validates naive DATETIME fields, fixes product *_lenght header spelling, removes exact geolocation duplicates and derives Brazil-bbox ZIP coordinate medians and deterministic lexicographic mode tie-breaks. Foreign keys remain enabled during import. Dataset manifests with server identity and actual counts are local-only.

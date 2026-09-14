@@ -1,0 +1,28 @@
+{
+  "repository": "https://github.com/kuotunyu/mysql-ecommerce-analytics",
+  "commit": "619ad706c35951bd6b811ac56765d6ad097ddbaa",
+  "files": [
+    {
+      "path": "schema.sql",
+      "sha256": "f2410d768d93e2f2bbf1225232f0e29e36db4af973016e0837ba2ba2f804e115",
+      "usage": "schema adapted"
+    },
+    {
+      "path": "analysis/00_views.sql",
+      "sha256": "a010f42c1547898b57c180b4308102a7a5856f45099be52c0f5190edaa3622fe",
+      "usage": "read-only reference"
+    },
+    {
+      "path": "etl/load.py",
+      "sha256": "0e3530c070e2e2279c325c185ce3367d3b8936b70f8926aa5136e9936a6014ac",
+      "usage": "read-only reference"
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "70e647a0ba8d4caf2d90de53115c8d197b08130509328f24cd2fd07f37af8cb8",
+      "usage": "license preserved"
+    }
+  ],
+  "dataset_source": "https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce",
+  "real_csv_included": false
+}
