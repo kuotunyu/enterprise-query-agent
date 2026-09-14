@@ -2,6 +2,18 @@
 
 ## 當前步驟
 
+### v1 後續本機補丁：Windows 帳本讀寫互斥
+
+2026-09-14，從乾淨的`408c036`建立`fix/windows-ledger-reader-lock`，限縮處理已有Windows並發帳本失敗，不追加模型呼叫或研究。此補丁是新的候選版本，不是原正式評估的凍結候選；原192結果、gold/scorer、報告、成本帳本及v1.0.0 tag均不修改，尚未push、合併或發布新版。
+
+- 根因已決定性重現：`__init__`／`total`／`records`的`_read`未參與writer lock。測試以Event固定交錯，保持真實`rb`檔案handle開啟，再執行writer原子替換；三條讀取路徑都在`os.replace`重現WinError5。反向交錯也證實writer持鎖時reader仍能開檔。修補前新增6例全失敗，沒有依賴sleep或反覆重跑碰運氣。
+- 最小修正：抽出共用的獨占`_locked`，讀取從開檔到關閉handle皆受同一把跨程序O_EXCL鎖保護；writer在持鎖內用`_read_locked`避免巢狀鎖。遇既有鎖仍立即BudgetError，沒有吞PermissionError、重試替換或送出provider。原子替換、fsync、持久預留、未知usage保守保留與stage隔離均沿用。
+- Windows驗證：成本套件**17 passed（1.63秒）**；完整`uv run --offline --frozen pytest -m "not integration and not ui" -q`為**120 passed／41 deselected／1原有warning（3.40秒）**。新增6例涵蓋三種reader與writer雙向交錯；讀取結束後能正常預留，沒有殘留pending或多扣額度。所有測試只使用暫存帳本。
+- 本機重現log為`.local/ledger-reader-red.log`，完整離線log為`.local/ledger-reader-suite.log`；原失敗歷史保留。這只修正本案協作reader造成的Windows替換衝突，不宣稱可排除外部程式鎖檔或檔案系統權限錯誤。
+- 定向唯讀審查通過，未發現重要缺陷；審查者檢查鎖生命週期、無巢狀取鎖、錯誤釋放與費用邊界，未額外執行測試。原tasks/gold/scorer雜湊與v1.0.0目標一致；development/research帳本上界仍為US$0.10021435／US$0.19103280。補丁僅供本機核對，現有已啟動服務未套用新版本。
+
+### 已發布 v1 紀錄（保留）
+
 2026-09-14：**v1全部四步完成，已公開發布並結案。** [原始碼](https://github.com/kuotunyu/enterprise-query-agent)為public，main推送成功；[v1.0.0 release](https://github.com/kuotunyu/enterprise-query-agent/releases/tag/v1.0.0)已發布，tag指向`faea3a6`。工作台仍為本機產品，未進行雲端部署。
 
 [GitHub CI](https://github.com/kuotunyu/enterprise-query-agent/actions/runs/34852517670)兩個job通過：離線114 passed／41 deselected；MySQL143 passed／8 skipped／4 deselected，均1原有warning。初次Linux CI暴露測試將每個waiter的wall_seconds誤當去重答案的一部分；僅修正測試排除該欄位，仍驗證其餘答案完全一致、一次模型／SQL執行及request-id衝突。候選程式、gold、評分與正式成績未修改，早期失敗CI保留。沒有追加付費研究。

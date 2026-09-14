@@ -1,4 +1,4 @@
-"""Local cost journal. Exclusive writers, atomic replacement, fail closed.
+"""Local cost journal. Exclusive access, atomic replacement, fail closed.
 
 Reservations cover the entire documented model context at long-context cache
 write rates, plus maximum output. This avoids treating a tokenizer estimate as
@@ -52,6 +52,12 @@ class CostLedger:
             raise BudgetError('Existing budget ledger cannot be replaced') from exc
 
     def _read(self):
+        # Windows cannot replace a ledger while another reader holds it open.
+        with self._locked():
+            return self._read_locked()
+
+    def _read_locked(self):
+        """Caller holds the shared reader/writer lock through handle closure."""
         try:
             wrapper = json.loads(self.path.read_bytes())
             data = wrapper['data']
@@ -64,7 +70,7 @@ class CostLedger:
             raise BudgetError('Missing, corrupt or incompatible budget ledger') from exc
 
     @contextmanager
-    def _write(self):
+    def _locked(self):
         lock = self.path.with_suffix('.lock')
         try:
             descriptor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
@@ -72,15 +78,20 @@ class CostLedger:
             raise BudgetError('Budget ledger locked; no request sent') from exc
         try:
             os.close(descriptor)
-            data = self._read()
+            yield
+        finally:
+            lock.unlink()
+
+    @contextmanager
+    def _write(self):
+        with self._locked():
+            data = self._read_locked()
             yield data
             wrapper = {'data': data, 'sha256': hashlib.sha256(encoded(data)).hexdigest()}
             pending = self.path.with_suffix('.pending')
             with pending.open('wb') as stream:
                 stream.write(encoded(wrapper)); stream.flush(); os.fsync(stream.fileno())
             os.replace(pending, self.path)
-        finally:
-            lock.unlink()
 
     def _total(self, data):
         return sum((Decimal(c['charged_upper_usd']) for c in data['calls'].values()

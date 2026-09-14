@@ -96,6 +96,84 @@ def test_concurrent_reservations_cannot_overdraw(tmp_path):
     assert CostLedger(path,'development').total()==Decimal('0.5323728')
 
 
+@pytest.mark.parametrize('operation', ['construct', 'total', 'records'])
+def test_open_reader_excludes_reservation_until_handle_closes(tmp_path, monkeypatch, operation):
+    from concurrent.futures import ThreadPoolExecutor
+    from pathlib import Path
+    from threading import Event, current_thread
+    from enterprise_query.costs import CostLedger, BudgetError, RESERVATION
+    path = tmp_path/'ledger.json'
+    CostLedger.initialize(path, {'development': '0.60', 'research': '1'})
+    ledger = CostLedger(path, 'development')
+    opened, release = Event(), Event()
+    original_read = Path.read_bytes
+
+    def paused_read(target):
+        if target == path and current_thread().name.startswith('ledger-reader'):
+            # Hold a real OS handle: on Windows an uncoordinated replace fails.
+            with target.open('rb') as handle:
+                opened.set()
+                assert release.wait(5), 'reader was not released'
+                return handle.read()
+        return original_read(target)
+
+    def read():
+        if operation == 'construct':
+            return CostLedger(path, 'research')
+        return ledger.total() if operation == 'total' else ledger.records({'one'})
+
+    monkeypatch.setattr(Path, 'read_bytes', paused_read)
+    with ThreadPoolExecutor(max_workers=1, thread_name_prefix='ledger-reader') as pool:
+        reader = pool.submit(read)
+        try:
+            assert opened.wait(5), 'reader never opened the ledger'
+            with pytest.raises(BudgetError, match='locked'):
+                ledger.reserve('blocked')
+            assert not path.with_suffix('.pending').exists()
+        finally:
+            release.set()
+        reader.result(timeout=5)
+    ticket = ledger.reserve('one')
+    assert ledger.total() == RESERVATION
+    assert set(ledger.records({'blocked', 'one'})) == {ticket}
+    assert CostLedger(path, 'research').total() == 0
+
+
+@pytest.mark.parametrize('operation', ['construct', 'total', 'records'])
+def test_writer_excludes_readers_until_atomic_commit(tmp_path, monkeypatch, operation):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    from enterprise_query import costs
+    path = tmp_path/'ledger.json'
+    costs.CostLedger.initialize(path, {'development': '0.60', 'research': '1'})
+    ledger = costs.CostLedger(path, 'development')
+    pending, release = Event(), Event()
+    original_replace = costs.os.replace
+
+    def paused_replace(source, destination):
+        pending.set()
+        assert release.wait(5), 'writer was not released'
+        return original_replace(source, destination)
+
+    monkeypatch.setattr(costs.os, 'replace', paused_replace)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        writer = pool.submit(ledger.reserve, 'one')
+        try:
+            assert pending.wait(5), 'writer never reached commit'
+            with pytest.raises(costs.BudgetError, match='locked'):
+                if operation == 'construct':
+                    costs.CostLedger(path, 'research')
+                elif operation == 'total':
+                    ledger.total()
+                else:
+                    ledger.records({'one'})
+        finally:
+            release.set()
+        ticket = writer.result(timeout=5)
+    assert ledger.total() == costs.RESERVATION
+    assert set(ledger.records({'one'})) == {ticket}
+
+
 def test_oversize_input_never_reaches_transport(tmp_path):
     import httpx
     from openai import OpenAI
