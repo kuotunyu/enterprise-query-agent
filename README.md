@@ -55,7 +55,7 @@ $env:EQA_WEB_URL = "http://127.0.0.1:8011"
 uv run --env-file .local/runtime.env pytest -q
 ```
 
-缺少 MySQL／Web 的測試明示 skip，不算 pass。CI 分離離線與 MySQL jobs；本 session 沒有 GitHub Actions 執行成績。變體測試只在另建的隔離庫執行，見 [驗證紀錄](reports/engineering.md)。
+缺少 MySQL／Web 的測試明示 skip，不算 pass。CI 分離離線與 MySQL jobs；已在 GitHub Actions 通過離線114項及MySQL143項測試，詳見工程狀態。變體測試只在另建的隔離庫執行，見 [驗證紀錄](reports/engineering.md)。
 
 ## 控制與資料
 
@@ -75,7 +75,7 @@ uv run --env-file .local/runtime.env pytest -q
 
 已完成 A 固定模板、B 直接 SQL、C 業務計畫三種 structured-output adapter 與共用離線 runner。`scripts/run_comparison.py --run-id <新名稱> --dataset-manifest <本機manifest>` 固定使用 26 個公開開發問題、預設跑 mock；紀錄寫入 `.local/comparison-runs`，拒绝覆寫既有 run，付費開發另需明確 `--paid`、`EQA_ENABLE_PAID_API=1`、已批准帳本與本機 key。完整命令、真資料身分與驗證結果見 [工程狀態](docs/status.md)。
 
-工作台預設不啟用付費；即使環境有 key 仍走 mock。此專案已核准 `gpt-5.6-luna` 的開發 US$25／正式研究 US$20 獨立上限，兩階段執行完成，含工作台驗證的費用保守上界合計US$0.29124715，精確帳單不可得。新的使用者需自行設定並批准本機額度。沒有部署或GitHub發布。adapter技術細節見 [M4交接](docs/m4-handoff.md)。
+工作台預設不啟用付費；即使環境有 key 仍走 mock。此專案已核准 `gpt-5.6-luna` 的開發 US$25／正式研究 US$20 獨立上限，兩階段執行完成，含工作台驗證的費用保守上界合計US$0.29124715，精確帳單不可得。新的使用者需自行設定並批准本機額度。已發布 [v1.0.0](https://github.com/kuotunyu/enterprise-query-agent/releases/tag/v1.0.0)，沒有雲端部署。adapter技術細節見 [M4交接](docs/m4-handoff.md)。
 
 本機設定範例（仍停用付費；不包含 key）：
 

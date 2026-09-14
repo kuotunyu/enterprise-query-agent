@@ -8,6 +8,6 @@
 
 發布內容包括原始碼、測試、frozen lockfile、合成開發fixture、README、操作示範、正式／開發結果摘要及來源授權。排除`.local`、實際CSV、金鑰、runtime／bootstrap設定、私人handoff、provider原始traces。完整研究journal與gold保留本機，公开摘要本身不足以獨立重播正式研究。
 
-驗證：乾淨來源114項離線測試通過；正式harness8項離線測試；真模型桌面與390px手機操作通過；正式資料／事件／候選雜湊核對通過。Windows並發帳本測試曾偶發PermissionError，重驗通過但根因未解；正式執行無此中斷。沒有雲端CI執行成績或部署宣稱。
+驗證：[GitHub CI](https://github.com/kuotunyu/enterprise-query-agent/actions/runs/34852517670)離線114 passed、MySQL143 passed／8 skipped／4 deselected；正式harness8項離線測試；真模型桌面與390px手機操作通過；正式資料／事件／候選雜湊核對通過。初次Linux CI的去重測試因wall_seconds差異失敗，僅修正測試比較，不改候選或研究分數。Windows並發帳本測試曾偶發PermissionError，重驗通過但根因未解；正式執行無此中斷。未進行雲端部署。
 
 詳細成績、費用、代表性失敗與研究限制見 [正式報告](../reports/formal-luna.md)。來源、上游MIT授權與資料出處見 [provenance](../provenance/README.md)。

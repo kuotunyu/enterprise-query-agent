@@ -2,7 +2,9 @@
 
 ## 當前步驟
 
-2026-09-14：**v1本機交付、一次正式比較與公開原始碼發布完成，release收尾中。** 使用者已批准發布，[kuotunyu/enterprise-query-agent](https://github.com/kuotunyu/enterprise-query-agent)已建立為public，main推送成功，實作提交`3f7b435`。發布前114項離線測試通過（3.37秒），41 deselected、1原有warning。未進行雲端部署。
+2026-09-14：**v1全部四步完成，已公開發布並結案。** [原始碼](https://github.com/kuotunyu/enterprise-query-agent)為public，main推送成功；[v1.0.0 release](https://github.com/kuotunyu/enterprise-query-agent/releases/tag/v1.0.0)已發布，tag指向`faea3a6`。工作台仍為本機產品，未進行雲端部署。
+
+[GitHub CI](https://github.com/kuotunyu/enterprise-query-agent/actions/runs/34852517670)兩個job通過：離線114 passed／41 deselected；MySQL143 passed／8 skipped／4 deselected，均1原有warning。初次Linux CI暴露測試將每個waiter的wall_seconds誤當去重答案的一部分；僅修正測試排除該欄位，仍驗證其餘答案完全一致、一次模型／SQL執行及request-id衝突。候選程式、gold、評分與正式成績未修改，早期失敗CI保留。沒有追加付費研究。
 
 Git發布的31份候選來源與凍結來源逐檔核對，僅12份CRLF→LF換行正規化，沒有邏輯變動；對照見 [publication-provenance.json](../reports/publication-provenance.json)。舊工程分支及本機完整研究材料保留，原始CSV、憑證與provider traces未推送。下方「未發布／待授權」敘述為先前階段紀錄，以本段為準。
 
