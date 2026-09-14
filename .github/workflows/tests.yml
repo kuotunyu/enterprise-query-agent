@@ -1,0 +1,22 @@
+name: local-engineering
+on: [push, pull_request]
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen --python 3.12
+      - run: uv run pytest -m "not integration and not ui" -q
+  mysql:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen --python 3.12
+      - run: uv run python scripts/configure_local.py
+      - run: docker compose --env-file .local/bootstrap.env up -d --wait
+      - run: uv run --env-file .local/bootstrap.env python scripts/bootstrap_data.py
+      - run: uv run --env-file .local/runtime.env pytest -m "not ui" -q
+        env:
+          EQA_INTEGRATION: '1'

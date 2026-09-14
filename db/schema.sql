@@ -124,4 +124,3 @@ CREATE TABLE order_reviews (
     CONSTRAINT fk_reviews_order FOREIGN KEY (order_id) REFERENCES orders (order_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
   COMMENT='評論（review_id 可跨訂單重複，複合 PK）';
-

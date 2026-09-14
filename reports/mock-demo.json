@@ -1,0 +1,638 @@
+{
+  "mode": "deterministic mock, not model evaluation",
+  "dataset_id": "synthetic-v1",
+  "examples": [
+    {
+      "question": "2018年7月營收多少",
+      "first_status": "needs_clarification",
+      "expected_status": "answered",
+      "outcome": {
+        "status": "answered",
+        "message": "已依指定口徑查得結果。",
+        "request_id": "39ff7cc4-fd51-4c6e-921e-a4800c0867bd",
+        "session_id": "3f17ccc6-9036-4126-9873-ee60ccf90d30",
+        "revision": 2,
+        "mode": "mock",
+        "facts": [
+          {
+            "metric_id": "gmv",
+            "value": "242.00",
+            "unit": "BRL",
+            "display": "242.00 BRL",
+            "result_reference": [
+              "cada48b9-0862-48fc-8a5d-013d161fd6bd:rows[0]"
+            ],
+            "calculation": "商品金額＋運費"
+          }
+        ],
+        "table": [
+          {
+            "population_count": 3,
+            "gmv": "242.00",
+            "merchandise_value": "220.00",
+            "delivered_order_count": 3,
+            "aov": "80.66666666666666666666666667"
+          }
+        ],
+        "definition": [
+          "商品金額＋運費"
+        ],
+        "population": "delivered",
+        "time_range": {
+          "start": "2018-07-01",
+          "end": "2018-08-01"
+        },
+        "coverage": "source-policy complete months",
+        "limitations": [
+          "合成資料，僅供工程示範；mock 不代表模型能力。",
+          "來源 DATETIME 不作時區換算；日期區間含起日、不含迄日。",
+          "完整月範圍是前作分析採用的 coverage policy，非獨立證實的完整性。"
+        ],
+        "evidence": [
+          {
+            "query_id": "cada48b9-0862-48fc-8a5d-013d161fd6bd",
+            "sql": "SELECT COUNT(DISTINCT o.order_id) AS population_count, SUM(v.gmv) AS gmv, SUM(v.merchandise) AS merchandise_value, COUNT(DISTINCT o.order_id) AS delivered_order_count FROM orders o JOIN customers c ON c.customer_id=o.customer_id LEFT JOIN (SELECT order_id, SUM(price+freight_value) AS gmv, SUM(price) AS merchandise FROM order_items GROUP BY order_id) v ON v.order_id=o.order_id  WHERE o.order_purchase_timestamp >= %s AND o.order_purchase_timestamp < %s AND o.order_status = 'delivered'",
+            "parameters": [
+              "2018-07-01",
+              "2018-08-01"
+            ],
+            "columns": [
+              "population_count",
+              "gmv",
+              "merchandise_value",
+              "delivered_order_count"
+            ],
+            "column_types": [
+              "8",
+              "246",
+              "246",
+              "8"
+            ],
+            "rows": [
+              {
+                "population_count": 3,
+                "gmv": "242.00",
+                "merchandise_value": "220.00",
+                "delivered_order_count": 3
+              }
+            ],
+            "row_count": 1,
+            "truncated": false,
+            "elapsed_ms": 30.99999999994907,
+            "dataset_id": "synthetic-v1",
+            "result_hash": "80c9a5d688997eca6909ec5d8bc96bc905a2154c5e4893183e6bd3ba4edf7ec4"
+          }
+        ],
+        "options": [],
+        "usage": {
+          "model_calls": 2,
+          "sql_selects": 1,
+          "clarification_rounds": 1,
+          "active_seconds": 0.047,
+          "wall_seconds": 0.062,
+          "attempts": [
+            {
+              "call": 1,
+              "status": "completed",
+              "provider_usage": {}
+            },
+            {
+              "call": 2,
+              "status": "completed",
+              "provider_usage": {}
+            }
+          ],
+          "errors": []
+        }
+      }
+    },
+    {
+      "question": "2018年7月GMV、訂單數與AOV",
+      "first_status": "answered",
+      "expected_status": "answered",
+      "outcome": {
+        "status": "answered",
+        "message": "已依指定口徑查得結果。",
+        "request_id": "f358e798-8b9a-4ddb-afd7-35968ebeef1c",
+        "session_id": "2043f831-34ad-4a8b-9f86-351892eb8ae5",
+        "revision": 1,
+        "mode": "mock",
+        "facts": [
+          {
+            "metric_id": "gmv",
+            "value": "242.00",
+            "unit": "BRL",
+            "display": "242.00 BRL",
+            "result_reference": [
+              "ac7b8dbc-6d20-475e-8678-8f9a747da496:rows[0]"
+            ],
+            "calculation": "商品金額＋運費"
+          },
+          {
+            "metric_id": "delivered_order_count",
+            "value": 3,
+            "unit": "orders",
+            "display": "3",
+            "result_reference": [
+              "ac7b8dbc-6d20-475e-8678-8f9a747da496:rows[0]"
+            ],
+            "calculation": "delivered 不重複訂單數"
+          },
+          {
+            "metric_id": "aov",
+            "value": "80.66666666666666666666666667",
+            "unit": "BRL",
+            "display": "80.67 BRL",
+            "result_reference": [
+              "ac7b8dbc-6d20-475e-8678-8f9a747da496:rows[0]"
+            ],
+            "calculation": "GMV／同一 population 的不重複訂單數"
+          }
+        ],
+        "table": [
+          {
+            "population_count": 3,
+            "gmv": "242.00",
+            "merchandise_value": "220.00",
+            "delivered_order_count": 3,
+            "aov": "80.66666666666666666666666667"
+          }
+        ],
+        "definition": [
+          "商品金額＋運費",
+          "delivered 不重複訂單數",
+          "GMV／同一 population 的不重複訂單數"
+        ],
+        "population": "delivered",
+        "time_range": {
+          "start": "2018-07-01",
+          "end": "2018-08-01"
+        },
+        "coverage": "source-policy complete months",
+        "limitations": [
+          "合成資料，僅供工程示範；mock 不代表模型能力。",
+          "來源 DATETIME 不作時區換算；日期區間含起日、不含迄日。",
+          "完整月範圍是前作分析採用的 coverage policy，非獨立證實的完整性。"
+        ],
+        "evidence": [
+          {
+            "query_id": "ac7b8dbc-6d20-475e-8678-8f9a747da496",
+            "sql": "SELECT COUNT(DISTINCT o.order_id) AS population_count, SUM(v.gmv) AS gmv, SUM(v.merchandise) AS merchandise_value, COUNT(DISTINCT o.order_id) AS delivered_order_count FROM orders o JOIN customers c ON c.customer_id=o.customer_id LEFT JOIN (SELECT order_id, SUM(price+freight_value) AS gmv, SUM(price) AS merchandise FROM order_items GROUP BY order_id) v ON v.order_id=o.order_id  WHERE o.order_purchase_timestamp >= %s AND o.order_purchase_timestamp < %s AND o.order_status = 'delivered'",
+            "parameters": [
+              "2018-07-01",
+              "2018-08-01"
+            ],
+            "columns": [
+              "population_count",
+              "gmv",
+              "merchandise_value",
+              "delivered_order_count"
+            ],
+            "column_types": [
+              "8",
+              "246",
+              "246",
+              "8"
+            ],
+            "rows": [
+              {
+                "population_count": 3,
+                "gmv": "242.00",
+                "merchandise_value": "220.00",
+                "delivered_order_count": 3
+              }
+            ],
+            "row_count": 1,
+            "truncated": false,
+            "elapsed_ms": 14.99999999987267,
+            "dataset_id": "synthetic-v1",
+            "result_hash": "80c9a5d688997eca6909ec5d8bc96bc905a2154c5e4893183e6bd3ba4edf7ec4"
+          }
+        ],
+        "options": [],
+        "usage": {
+          "model_calls": 1,
+          "sql_selects": 1,
+          "clarification_rounds": 0,
+          "active_seconds": 0.047,
+          "wall_seconds": 0.047,
+          "attempts": [
+            {
+              "call": 1,
+              "status": "completed",
+              "provider_usage": {}
+            }
+          ],
+          "errors": []
+        }
+      }
+    },
+    {
+      "question": "2018年7月GMV按品類",
+      "first_status": "answered",
+      "expected_status": "answered",
+      "outcome": {
+        "status": "answered",
+        "message": "已依指定口徑查得結果。",
+        "request_id": "b2fd4ff9-ef9a-4f6c-ab87-3a381d0be398",
+        "session_id": "f515cec3-5cea-4218-90d9-b195d20791d9",
+        "revision": 1,
+        "mode": "mock",
+        "facts": [
+          {
+            "metric_id": "gmv",
+            "value": "154.00",
+            "unit": "BRL",
+            "display": "154.00 BRL",
+            "result_reference": [
+              "8905512b-8251-47cb-b0ce-504160f33668:rows[0]"
+            ],
+            "calculation": "商品金額＋運費"
+          },
+          {
+            "metric_id": "gmv",
+            "value": "88.00",
+            "unit": "BRL",
+            "display": "88.00 BRL",
+            "result_reference": [
+              "8905512b-8251-47cb-b0ce-504160f33668:rows[1]"
+            ],
+            "calculation": "商品金額＋運費"
+          }
+        ],
+        "table": [
+          {
+            "category": "A",
+            "population_count": 2,
+            "gmv": "154.00",
+            "merchandise_value": "140.00",
+            "delivered_order_count": 2,
+            "aov": "77.00"
+          },
+          {
+            "category": "B",
+            "population_count": 2,
+            "gmv": "88.00",
+            "merchandise_value": "80.00",
+            "delivered_order_count": 2,
+            "aov": "44.00"
+          }
+        ],
+        "definition": [
+          "商品金額＋運費"
+        ],
+        "population": "delivered",
+        "time_range": {
+          "start": "2018-07-01",
+          "end": "2018-08-01"
+        },
+        "coverage": "source-policy complete months",
+        "limitations": [
+          "合成資料，僅供工程示範；mock 不代表模型能力。",
+          "來源 DATETIME 不作時區換算；日期區間含起日、不含迄日。",
+          "完整月範圍是前作分析採用的 coverage policy，非獨立證實的完整性。",
+          "同訂單可跨品類或賣家；分組訂單數不可相加成總訂單數。"
+        ],
+        "evidence": [
+          {
+            "query_id": "8905512b-8251-47cb-b0ce-504160f33668",
+            "sql": "SELECT COALESCE(t.product_category_name_english, p.product_category_name, 'unknown') AS `category`, COUNT(DISTINCT o.order_id) AS population_count, SUM(i.price+i.freight_value) AS gmv, SUM(i.price) AS merchandise_value, COUNT(DISTINCT o.order_id) AS delivered_order_count FROM orders o JOIN customers c ON c.customer_id=o.customer_id JOIN order_items i ON i.order_id=o.order_id LEFT JOIN products p ON p.product_id=i.product_id LEFT JOIN product_category_name_translation t ON t.product_category_name=p.product_category_name  WHERE o.order_purchase_timestamp >= %s AND o.order_purchase_timestamp < %s AND o.order_status = 'delivered' GROUP BY COALESCE(t.product_category_name_english, p.product_category_name, 'unknown') ORDER BY COALESCE(t.product_category_name_english, p.product_category_name, 'unknown') LIMIT 201",
+            "parameters": [
+              "2018-07-01",
+              "2018-08-01"
+            ],
+            "columns": [
+              "category",
+              "population_count",
+              "gmv",
+              "merchandise_value",
+              "delivered_order_count"
+            ],
+            "column_types": [
+              "253",
+              "8",
+              "246",
+              "246",
+              "8"
+            ],
+            "rows": [
+              {
+                "category": "A",
+                "population_count": 2,
+                "gmv": "154.00",
+                "merchandise_value": "140.00",
+                "delivered_order_count": 2
+              },
+              {
+                "category": "B",
+                "population_count": 2,
+                "gmv": "88.00",
+                "merchandise_value": "80.00",
+                "delivered_order_count": 2
+              }
+            ],
+            "row_count": 2,
+            "truncated": false,
+            "elapsed_ms": 47.000000000025466,
+            "dataset_id": "synthetic-v1",
+            "result_hash": "11dc871aeedffd8907f3a62677f66d11c59cb3491eb86e8fa5621019d8861a05"
+          }
+        ],
+        "options": [],
+        "usage": {
+          "model_calls": 1,
+          "sql_selects": 1,
+          "clarification_rounds": 0,
+          "active_seconds": 0.094,
+          "wall_seconds": 0.094,
+          "attempts": [
+            {
+              "call": 1,
+              "status": "completed",
+              "provider_usage": {}
+            }
+          ],
+          "errors": []
+        }
+      }
+    },
+    {
+      "question": "2018年7月延遲率",
+      "first_status": "answered",
+      "expected_status": "answered",
+      "outcome": {
+        "status": "answered",
+        "message": "已依指定口徑查得結果。",
+        "request_id": "316b5c00-bb81-441c-95a6-0ba15a9a82d4",
+        "session_id": "cde84fb3-87a1-4af2-9695-21d8eb333e8c",
+        "revision": 1,
+        "mode": "mock",
+        "facts": [
+          {
+            "metric_id": "late_rate",
+            "value": "0.5",
+            "unit": "ratio",
+            "display": "50.00%",
+            "result_reference": [
+              "7460e3dd-a8d8-4590-b77a-021440a81d4e:rows[0]"
+            ],
+            "calculation": "實際送達晚於預估送達的比例"
+          }
+        ],
+        "table": [
+          {
+            "population_count": 3,
+            "eligible": "2",
+            "late": "1",
+            "missing": "1",
+            "late_rate": "0.5"
+          }
+        ],
+        "definition": [
+          "實際送達晚於預估送達的比例"
+        ],
+        "population": "delivered",
+        "time_range": {
+          "start": "2018-07-01",
+          "end": "2018-08-01"
+        },
+        "coverage": "source-policy complete months",
+        "limitations": [
+          "合成資料，僅供工程示範；mock 不代表模型能力。",
+          "來源 DATETIME 不作時區換算；日期區間含起日、不含迄日。",
+          "完整月範圍是前作分析採用的 coverage policy，非獨立證實的完整性。"
+        ],
+        "evidence": [
+          {
+            "query_id": "7460e3dd-a8d8-4590-b77a-021440a81d4e",
+            "sql": "SELECT COUNT(DISTINCT o.order_id) AS population_count, SUM(CASE WHEN o.order_delivered_customer_date IS NOT NULL AND o.order_estimated_delivery_date IS NOT NULL THEN 1 ELSE 0 END) AS eligible, SUM(CASE WHEN o.order_delivered_customer_date > o.order_estimated_delivery_date THEN 1 ELSE 0 END) AS late, SUM(CASE WHEN o.order_delivered_customer_date IS NOT NULL AND o.order_estimated_delivery_date IS NOT NULL THEN 0 ELSE 1 END) AS missing FROM orders o JOIN customers c ON c.customer_id=o.customer_id LEFT JOIN (SELECT order_id, SUM(price+freight_value) AS gmv, SUM(price) AS merchandise FROM order_items GROUP BY order_id) v ON v.order_id=o.order_id  WHERE o.order_purchase_timestamp >= %s AND o.order_purchase_timestamp < %s AND o.order_status = 'delivered'",
+            "parameters": [
+              "2018-07-01",
+              "2018-08-01"
+            ],
+            "columns": [
+              "population_count",
+              "eligible",
+              "late",
+              "missing"
+            ],
+            "column_types": [
+              "8",
+              "246",
+              "246",
+              "246"
+            ],
+            "rows": [
+              {
+                "population_count": 3,
+                "eligible": "2",
+                "late": "1",
+                "missing": "1"
+              }
+            ],
+            "row_count": 1,
+            "truncated": false,
+            "elapsed_ms": 30.99999999994907,
+            "dataset_id": "synthetic-v1",
+            "result_hash": "239007c34a4c5db057e7f7d4a81860118d9ee66ed7cf6cf422932b6c38f1a9c9"
+          }
+        ],
+        "options": [],
+        "usage": {
+          "model_calls": 1,
+          "sql_selects": 1,
+          "clarification_rounds": 0,
+          "active_seconds": 0.047,
+          "wall_seconds": 0.047,
+          "attempts": [
+            {
+              "call": 1,
+              "status": "completed",
+              "provider_usage": {}
+            }
+          ],
+          "errors": []
+        }
+      }
+    },
+    {
+      "question": "2018年7月最新評論平均",
+      "first_status": "answered",
+      "expected_status": "answered",
+      "outcome": {
+        "status": "answered",
+        "message": "已依指定口徑查得結果。",
+        "request_id": "86ab2154-43ab-41f3-8085-3fc7fb52878d",
+        "session_id": "6ca5fa08-5926-48a5-9de9-0cfb28534fe7",
+        "revision": 1,
+        "mode": "mock",
+        "facts": [
+          {
+            "metric_id": "average_review_score",
+            "value": "4",
+            "unit": "score",
+            "display": "4",
+            "result_reference": [
+              "81bcf93f-52a4-4a66-84db-75166049c150:rows[0]"
+            ],
+            "calculation": "每訂單最新評分平均，依creation、answer、review_id倒序"
+          }
+        ],
+        "table": [
+          {
+            "population_count": 3,
+            "score_sum": "8",
+            "eligible": 2,
+            "missing": "1",
+            "average_review_score": "4"
+          }
+        ],
+        "definition": [
+          "每訂單最新評分平均，依creation、answer、review_id倒序"
+        ],
+        "population": "delivered",
+        "time_range": {
+          "start": "2018-07-01",
+          "end": "2018-08-01"
+        },
+        "coverage": "source-policy complete months",
+        "limitations": [
+          "合成資料，僅供工程示範；mock 不代表模型能力。",
+          "來源 DATETIME 不作時區換算；日期區間含起日、不含迄日。",
+          "完整月範圍是前作分析採用的 coverage policy，非獨立證實的完整性。"
+        ],
+        "evidence": [
+          {
+            "query_id": "81bcf93f-52a4-4a66-84db-75166049c150",
+            "sql": "SELECT COUNT(DISTINCT o.order_id) AS population_count, SUM(rev.review_score) AS score_sum, COUNT(rev.review_score) AS eligible, SUM(CASE WHEN rev.review_score IS NULL THEN 1 ELSE 0 END) AS missing FROM orders o JOIN customers c ON c.customer_id=o.customer_id LEFT JOIN (SELECT order_id, SUM(price+freight_value) AS gmv, SUM(price) AS merchandise FROM order_items GROUP BY order_id) v ON v.order_id=o.order_id LEFT JOIN v_order_review rev ON rev.order_id=o.order_id  WHERE o.order_purchase_timestamp >= %s AND o.order_purchase_timestamp < %s AND o.order_status = 'delivered'",
+            "parameters": [
+              "2018-07-01",
+              "2018-08-01"
+            ],
+            "columns": [
+              "population_count",
+              "score_sum",
+              "eligible",
+              "missing"
+            ],
+            "column_types": [
+              "8",
+              "246",
+              "8",
+              "246"
+            ],
+            "rows": [
+              {
+                "population_count": 3,
+                "score_sum": "8",
+                "eligible": 2,
+                "missing": "1"
+              }
+            ],
+            "row_count": 1,
+            "truncated": false,
+            "elapsed_ms": 14.99999999987267,
+            "dataset_id": "synthetic-v1",
+            "result_hash": "987c70ebe0c17af2769733e12baa600e2f052d31074dddb011a296bdd2c5cd3b"
+          }
+        ],
+        "options": [],
+        "usage": {
+          "model_calls": 1,
+          "sql_selects": 1,
+          "clarification_rounds": 0,
+          "active_seconds": 0.031,
+          "wall_seconds": 0.031,
+          "attempts": [
+            {
+              "call": 1,
+              "status": "completed",
+              "provider_usage": {}
+            }
+          ],
+          "errors": []
+        }
+      }
+    },
+    {
+      "question": "上個月GMV",
+      "first_status": "empty",
+      "expected_status": "empty",
+      "outcome": {
+        "status": "empty",
+        "message": "指定期間／篩選條件沒有符合資料；不是金額為零。",
+        "request_id": "83731014-ecb6-47c9-a0c9-44f490744617",
+        "session_id": "8220a643-4c4a-4dea-8d71-a7bfbe4dc9f3",
+        "revision": 1,
+        "mode": "mock",
+        "facts": [],
+        "table": [],
+        "definition": [
+          "商品金額＋運費"
+        ],
+        "population": "delivered",
+        "time_range": {
+          "start": "2026-08-01",
+          "end": "2026-09-01"
+        },
+        "coverage": "partial/unknown",
+        "limitations": [
+          "合成資料，僅供工程示範；mock 不代表模型能力。",
+          "來源 DATETIME 不作時區換算；日期區間含起日、不含迄日。",
+          "完整月範圍是前作分析採用的 coverage policy，非獨立證實的完整性。"
+        ],
+        "evidence": [
+          {
+            "query_id": "c22580c2-cede-48c5-9de9-60eb1ef292de",
+            "sql": "SELECT COUNT(DISTINCT o.order_id) AS population_count, SUM(v.gmv) AS gmv, SUM(v.merchandise) AS merchandise_value, COUNT(DISTINCT o.order_id) AS delivered_order_count FROM orders o JOIN customers c ON c.customer_id=o.customer_id LEFT JOIN (SELECT order_id, SUM(price+freight_value) AS gmv, SUM(price) AS merchandise FROM order_items GROUP BY order_id) v ON v.order_id=o.order_id  WHERE o.order_purchase_timestamp >= %s AND o.order_purchase_timestamp < %s AND o.order_status = 'delivered'",
+            "parameters": [
+              "2026-08-01",
+              "2026-09-01"
+            ],
+            "columns": [
+              "population_count",
+              "gmv",
+              "merchandise_value",
+              "delivered_order_count"
+            ],
+            "column_types": [
+              "8",
+              "246",
+              "246",
+              "8"
+            ],
+            "rows": [
+              {
+                "population_count": 0,
+                "gmv": null,
+                "merchandise_value": null,
+                "delivered_order_count": 0
+              }
+            ],
+            "row_count": 1,
+            "truncated": false,
+            "elapsed_ms": 14.99999999987267,
+            "dataset_id": "synthetic-v1",
+            "result_hash": "d6a7eca539bed4b0e58f544e88efd05efbcba598a5feb59b51ee3dd5899ae659"
+          }
+        ],
+        "options": [],
+        "usage": {
+          "model_calls": 1,
+          "sql_selects": 1,
+          "clarification_rounds": 0,
+          "active_seconds": 0.047,
+          "wall_seconds": 0.047,
+          "attempts": [
+            {
+              "call": 1,
+              "status": "completed",
+              "provider_usage": {}
+            }
+          ],
+          "errors": []
+        }
+      }
+    }
+  ]
+}

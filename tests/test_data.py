@@ -117,3 +117,9 @@ def test_bootstrap_refuses_unmarked_or_foreign_destination():
     for identity,marker in [(('olist','source',3306,'8.4.11'),('eqa_v1',)),(('eqa_v1','isolated',3306,'8.0.0'),('eqa_v1',)),(('eqa_v1','isolated',3306,'8.4.11'),('other_project',))]:
         with pytest.raises(RuntimeError): verify_destination(Cursor(identity,marker))
     assert verify_destination(Cursor(('eqa_v1','isolated',3306,'8.4.11'),('eqa_v1',)))['database']=='eqa_v1'
+
+def test_csv_rejects_illegal_header_even_without_rows(tmp_path):
+    from scripts.bootstrap_data import FILES,load_csv
+    (tmp_path/FILES['product_category_name_translation']).write_text('product_category_name,`);DROP TABLE orders;--\n',encoding='utf-8')
+    with pytest.raises(ValueError,match='columns'):
+        load_csv(tmp_path)

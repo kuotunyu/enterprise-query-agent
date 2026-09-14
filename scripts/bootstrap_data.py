@@ -14,6 +14,60 @@ ROOT = Path(__file__).resolve().parents[1]
 TABLES = ['product_category_name_translation','customers','sellers','geolocation','products','orders','order_items','order_payments','order_reviews']
 FILES = {t: ('product_category_name_translation.csv' if t=='product_category_name_translation' else f'olist_{t}_dataset.csv') for t in TABLES}
 
+# Fixed schema allow-list; CSV headers never authorize SQL identifiers.
+COLUMNS = {'product_category_name_translation': ('product_category_name',
+                                       'product_category_name_english'),
+ 'customers': ('customer_id',
+               'customer_unique_id',
+               'customer_zip_code_prefix',
+               'customer_city',
+               'customer_state'),
+ 'sellers': ('seller_id',
+             'seller_zip_code_prefix',
+             'seller_city',
+             'seller_state'),
+ 'geolocation': ('geolocation_zip_code_prefix',
+                 'geolocation_lat',
+                 'geolocation_lng',
+                 'geolocation_city',
+                 'geolocation_state'),
+ 'products': ('product_id',
+              'product_category_name',
+              'product_name_length',
+              'product_description_length',
+              'product_photos_qty',
+              'product_weight_g',
+              'product_length_cm',
+              'product_height_cm',
+              'product_width_cm'),
+ 'orders': ('order_id',
+            'customer_id',
+            'order_status',
+            'order_purchase_timestamp',
+            'order_approved_at',
+            'order_delivered_carrier_date',
+            'order_delivered_customer_date',
+            'order_estimated_delivery_date'),
+ 'order_items': ('order_id',
+                 'order_item_id',
+                 'product_id',
+                 'seller_id',
+                 'shipping_limit_date',
+                 'price',
+                 'freight_value'),
+ 'order_payments': ('order_id',
+                    'payment_sequential',
+                    'payment_type',
+                    'payment_installments',
+                    'payment_value'),
+ 'order_reviews': ('review_id',
+                   'order_id',
+                   'review_score',
+                   'review_comment_title',
+                   'review_comment_message',
+                   'review_creation_date',
+                   'review_answer_timestamp')}
+
 def identifier(number):
     return f'{number:032x}'
 
@@ -55,12 +109,16 @@ def derive_geolocation(rows):
 
 def load_csv(directory):
     data={}; manifest=[]
-    expected = {table:set(rows[0]) for table,rows in synthetic_data().items()}
+    expected = {table:set(columns) for table,columns in COLUMNS.items()}
     for table in TABLES:
         path=directory/FILES[table]
         with path.open(encoding='utf-8-sig',newline='') as handle:
             rows=[]; seen=set(); raw_count=0
-            for raw in csv.DictReader(handle):
+            reader=csv.DictReader(handle)
+            headers=[k.replace('_lenght','_length') for k in (reader.fieldnames or [])]
+            if len(headers)!=len(set(headers)) or set(headers)!=expected[table]:
+                raise ValueError(f'CSV columns do not match {table}')
+            for raw in reader:
                 raw_count+=1
                 if None in raw or any(v is None for v in raw.values()): raise ValueError('Malformed CSV row')
                 row={k.replace('_lenght','_length'):(v.strip() or None) for k,v in raw.items()}
@@ -113,7 +171,7 @@ def bootstrap(csv_dir=None,variant='base'):
             data['geolocation_zip']=derive_geolocation(data['geolocation'])
             for table,rows in data.items():
                 if not rows: continue
-                columns=list(rows[0]); query=f"INSERT INTO `{table}` ({','.join('`'+c+'`' for c in columns)}) VALUES ({','.join(['%s']*len(columns))})"
+                columns=list(COLUMNS[table] if table in COLUMNS else ('zip_code_prefix','lat','lng','city','state','n_points')); query=f"INSERT INTO `{table}` ({','.join('`'+c+'`' for c in columns)}) VALUES ({','.join(['%s']*len(columns))})"
                 for offset in range(0,len(rows),1000): cur.executemany(query,[tuple(row[c] for c in columns) for row in rows[offset:offset+1000]])
             cur.execute("SELECT MIN(order_purchase_timestamp),MAX(order_purchase_timestamp) FROM orders")
             bounds=cur.fetchone()
@@ -143,5 +201,3 @@ if __name__=='__main__':
     parser.add_argument('--variant',choices=['base','split_payment','older_review'],default='base')
     args=parser.parse_args()
     bootstrap(args.csv_dir,args.variant)
-
-

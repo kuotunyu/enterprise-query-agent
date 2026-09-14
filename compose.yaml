@@ -19,4 +19,3 @@ services:
       retries: 40
 volumes:
   eqa_mysql_data:
-
