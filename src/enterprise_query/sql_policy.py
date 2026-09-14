@@ -37,6 +37,11 @@ def check_sql(sql: str) -> str:
             if isinstance(node, exp.With) and node.args.get('recursive'):
                 raise PolicyError('recursive CTE not allowed')
             if isinstance(node, exp.Func):
+                # MySQL DATE_FORMAT is normalized to TimeToStr with this
+                # implicit timestamp conversion by SQLGlot. Its children are
+                # still visited; arbitrary anonymous functions stay forbidden.
+                if isinstance(node, exp.TsOrDsToTimestamp) and isinstance(node.parent, exp.TimeToStr):
+                    continue
                 name = node.name.upper() if isinstance(node, exp.Anonymous) else node.sql_name()
                 if name not in FUNCTIONS:
                     raise PolicyError(f'function not allowed: {name}')

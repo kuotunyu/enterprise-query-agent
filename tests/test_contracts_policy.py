@@ -35,3 +35,11 @@ def test_plan_rejects_unsupported_payment_allocation_and_raw_sql():
     for extra in [{'metric_ids':['payment_value'], 'dimensions':['category']}, {'raw_sql':'SELECT 1'}, {'metric_ids':['profit']}]:
         with pytest.raises(ValidationError):
             QueryPlan.model_validate({'time_range':{'start':'2018-07-01','end':'2018-08-01'}, **extra})
+
+def test_compiled_month_grouping_passes_ast_policy():
+    from enterprise_query.compiler import compile_plan
+    from enterprise_query.contracts import QueryPlan
+    from enterprise_query.sql_policy import check_sql
+    plan=QueryPlan(metric_ids=['merchandise_value'],dimensions=['month'],time_range={'start':'2018-07-01','end':'2018-08-01'})
+    sql=compile_plan(plan)[0].sql
+    assert check_sql(sql.replace('%%','%'))==sql.replace('%%','%')

@@ -109,7 +109,8 @@ class Service:
                         else:
                             from .compiler import compile_plan
                             from .facts import build_answer
-                            queries=compile_plan(decision.plan)
+                            prepare=getattr(self.provider,'prepare',None)
+                            plan,queries=prepare(decision) if prepare else (decision.plan,compile_plan(decision.plan))
                             if t.sql+len(queries)>3: answer=envelope('rejected','已達每任務 3 條業務 SELECT 上限；请建立新任務。')
                             else:
                                 t.executor=self.executor_factory()
@@ -118,19 +119,32 @@ class Service:
                                 for query in queries:
                                     if t.cancelled or r.revision!=t.revision: break
                                     t.sql+=1
-                                    result=await asyncio.to_thread(t.executor.execute,query.sql,parameters=query.parameters,timeout_ms=min(5000,max(1,int((60-t.active-(time.monotonic()-started))*1000))))
+                                    try:
+                                        result=await asyncio.to_thread(t.executor.execute,query.sql,parameters=query.parameters,timeout_ms=min(5000,max(1,int((60-t.active-(time.monotonic()-started))*1000))))
+                                    except Exception as exc:
+                                        import pymysql
+                                        if getattr(self.provider,'method',None)=='B' and isinstance(exc,pymysql.MySQLError) and exc.args and exc.args[0] in {1052,1054,1055,1060,1064,1111,1140,1241,1242,1264,1292,1366,1582,1690}:
+                                            from .comparison import ModelOutputError
+                                            raise ModelOutputError('Model SQL rejected by MySQL',results) from exc
+                                        raise
                                     results.append(result)
                                 if t.cancelled or r.revision!=t.revision: answer=envelope('rejected','任務已取消或修訂已更新。')
-                                else: answer=build_answer(decision.plan,results)
+                                else:
+                                    validate=getattr(self.provider,'validate_results',None)
+                                    if validate: validate(plan,results)
+                                    answer=build_answer(plan,results)
             except (TimeoutError, asyncio.TimeoutError):
                 if t.attempts and t.attempts[-1]['status']=='started': t.attempts[-1].update(status='timeout',error_type='TimeoutError')
                 if t.executor is not None: t.executor.cancel()
                 answer=envelope('timeout','查詢或任務超時，已要求資料庫停止執行。')
             except Exception as exc:
                 # Do not leak connection strings, filesystem paths or provider traces.
-                status='rejected' if type(exc).__name__=='PolicyError' else ('timeout' if 'timeout' in type(exc).__name__.lower() else 'execution_error')
+                status='rejected' if type(exc).__name__ in ('PolicyError','ModelOutputError') else ('timeout' if 'timeout' in type(exc).__name__.lower() else 'execution_error')
                 t.errors.append({'revision':r.revision,'error_type':type(exc).__name__,'status':status})
                 answer=envelope(status,'執行失敗；請確認獨立資料庫身分、版本與唯讀設定。')
+                if type(exc).__name__=='ModelOutputError':
+                    answer.message='模型產生的 SQL 或結果格式不符合查詢契約；已保留失敗。'
+                    answer.evidence=exc.evidence
             finally:
                 t.active+=time.monotonic()-started
                 t.executor=None
@@ -146,13 +160,15 @@ class Service:
             try:
                 bounded=getattr(self.provider,'decide_with_timeout',None)
                 value=bounded(r,memory,remaining) if bounded else self.provider.decide(r,memory)
-                decision=PlannerDecision.model_validate(value)
+                decision=getattr(self.provider,'decision_schema',PlannerDecision).model_validate(value)
                 return decision,copy.deepcopy(getattr(self.provider,'last_usage',{})),None
             except Exception as exc:
                 return None,copy.deepcopy(getattr(self.provider,'last_usage',{})),type(exc).__name__
         try:
             decision,usage,error_type=await asyncio.to_thread(plan_once)
             attempt['provider_usage']=usage
+            if decision is not None and getattr(self.provider,'record_decision',False):
+                attempt['decision']=decision.model_dump(mode='json')
             attempt['completion']='failed' if error_type else 'completed'
             if error_type: attempt['error_type']=error_type
             if attempt['status']!='timeout': attempt['status']=attempt['completion']

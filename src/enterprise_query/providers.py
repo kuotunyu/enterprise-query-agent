@@ -1,6 +1,9 @@
 """Single provider adapter; network access requires explicit opt-in."""
 import json
 import os
+from pathlib import Path
+from .costs import CostLedger, budgeted_parse, BudgetError
+from .model_profile import MODEL_PROFILE
 from .contracts import PlannerDecision
 from .planner import MockPlanner
 
@@ -10,7 +13,9 @@ SYSTEM = '''你是歷史電商的受限 semantic planner。只回傳 PlannerDeci
 
 class OpenAIPlanner:
     mode = 'openai'
-    def __init__(self, model, api_key):
+    def __init__(self, model, api_key, ledger):
+        if model != MODEL_PROFILE['model']: raise BudgetError('Model does not match frozen price profile')
+        self.ledger=ledger
         from openai import OpenAI
         self.client=OpenAI(api_key=api_key,timeout=55,max_retries=0)
         self.model=model
@@ -20,9 +25,7 @@ class OpenAIPlanner:
         return self.decide(request,memory,timeout_seconds=min(55,remaining))
 
     def decide(self,request,memory,timeout_seconds=55):
-        raw=self.client.responses.with_raw_response.parse(model=self.model,input=[{'role':'system','content':SYSTEM},{'role':'user','content':json.dumps({'question':request.question,'clarification':request.clarification,'as_of_date':str(request.as_of_date),'confirmed_context':memory},ensure_ascii=False)}],text_format=PlannerDecision,timeout=timeout_seconds)
-        self.last_usage={'tokens':raw.http_response.json().get('usage'),'usd':None,'model':self.model,'provider':'openai'}
-        response=raw.parse()
+        response=budgeted_parse(self,request.request_id,[{'role':'system','content':SYSTEM},{'role':'user','content':json.dumps({'question':request.question,'clarification':request.clarification,'as_of_date':str(request.as_of_date),'confirmed_context':memory},ensure_ascii=False)}],PlannerDecision,timeout_seconds)
         if response.output_parsed is None: raise ValueError('provider did not return a valid structured plan')
         decision=response.output_parsed
         # Preserve user-provided context even when the planner needs a second
@@ -38,4 +41,5 @@ def configured_provider():
     if os.getenv('EQA_ENABLE_PAID_API') != '1': return MockPlanner()
     if os.getenv('EQA_PROVIDER') != 'openai' or not os.getenv('EQA_MODEL') or not os.getenv('OPENAI_API_KEY'):
         raise RuntimeError('Paid mode requires explicit EQA_PROVIDER=openai, EQA_MODEL and OPENAI_API_KEY')
-    return OpenAIPlanner(os.environ['EQA_MODEL'],os.environ['OPENAI_API_KEY'])
+    ledger=CostLedger(Path(__file__).resolve().parents[2]/'.local'/'cost-ledger.json',os.getenv('EQA_COST_STAGE'))
+    return OpenAIPlanner(os.environ['EQA_MODEL'],os.environ['OPENAI_API_KEY'],ledger)

@@ -1,0 +1,1139 @@
+{
+  "purpose": "public development data/engineering validation; not model performance or held-out evaluation",
+  "dataset_id": "olist-local-969f3ae180928f54",
+  "files": [
+    {
+      "file": "product_category_name_translation.csv",
+      "sha256": "a81f0d1f27b27e7293f761bc79e3ce8f348ee39c4b3ed3e49bde38f478586278",
+      "source_rows": 71,
+      "loaded_rows": 71
+    },
+    {
+      "file": "olist_customers_dataset.csv",
+      "sha256": "983a422239e1712ded753b3bf9ecf47dc73f144d306029dcfa99e70a226883d2",
+      "source_rows": 99441,
+      "loaded_rows": 99441
+    },
+    {
+      "file": "olist_sellers_dataset.csv",
+      "sha256": "1f643d2b950373b85735e7794b20986f528d7a000432e7c6f9bcbb44d0846a0e",
+      "source_rows": 3095,
+      "loaded_rows": 3095
+    },
+    {
+      "file": "olist_geolocation_dataset.csv",
+      "sha256": "b514f6fc991b9566aeba02aa5d67e2c3630f034b60a0e05aa0d082a3b66d88d6",
+      "source_rows": 1000163,
+      "loaded_rows": 738332
+    },
+    {
+      "file": "olist_products_dataset.csv",
+      "sha256": "3e6569628a17fbc75fd206ee357b59e20364b9afa90f5b6cd5b4d624c58aa9cc",
+      "source_rows": 32951,
+      "loaded_rows": 32951
+    },
+    {
+      "file": "olist_orders_dataset.csv",
+      "sha256": "8df58ef3d2d7e9944010f7beecd9b75367f5588ec6e3c91cec19ae3345ef9ecf",
+      "source_rows": 99441,
+      "loaded_rows": 99441
+    },
+    {
+      "file": "olist_order_items_dataset.csv",
+      "sha256": "0bc4d068c4fe38cbb01bd90e8746e3c613fe7b4baef75fab7b0e329701c3e279",
+      "source_rows": 112650,
+      "loaded_rows": 112650
+    },
+    {
+      "file": "olist_order_payments_dataset.csv",
+      "sha256": "4f713964f2815dbbaa40b9488268c55aac3627bfce5aa96cf58d1f3616de3cc0",
+      "source_rows": 103886,
+      "loaded_rows": 103886
+    },
+    {
+      "file": "olist_order_reviews_dataset.csv",
+      "sha256": "012b61c7593e34f51fa614efdf802b9c7056ce6aae5307ddb93236e7cfc797d7",
+      "source_rows": 99224,
+      "loaded_rows": 99224
+    }
+  ],
+  "row_counts": {
+    "product_category_name_translation": 71,
+    "customers": 99441,
+    "sellers": 3095,
+    "geolocation": 738332,
+    "products": 32951,
+    "orders": 99441,
+    "order_items": 112650,
+    "order_payments": 103886,
+    "order_reviews": 99224,
+    "geolocation_zip": 19011
+  },
+  "period": {
+    "purchase_min": "2016-09-04 21:15:19",
+    "purchase_max": "2018-10-17 17:30:18"
+  },
+  "duplicate_keys": {
+    "customers": 0,
+    "sellers": 0,
+    "products": 0,
+    "orders": 0,
+    "order_items": 0,
+    "order_payments": 0,
+    "order_reviews": 0,
+    "product_category_name_translation": 0
+  },
+  "orphan_relationships": {
+    "orders.customer_id": 0,
+    "order_items.order_id": 0,
+    "order_items.product_id": 0,
+    "order_items.seller_id": 0,
+    "order_payments.order_id": 0,
+    "order_reviews.order_id": 0
+  },
+  "null_counts": {
+    "product_category_name_translation": {
+      "product_category_name": 0,
+      "product_category_name_english": 0
+    },
+    "customers": {
+      "customer_id": 0,
+      "customer_unique_id": 0,
+      "customer_zip_code_prefix": 0,
+      "customer_city": 0,
+      "customer_state": 0
+    },
+    "sellers": {
+      "seller_id": 0,
+      "seller_zip_code_prefix": 0,
+      "seller_city": 0,
+      "seller_state": 0
+    },
+    "geolocation": {
+      "geolocation_zip_code_prefix": 0,
+      "geolocation_lat": 0,
+      "geolocation_lng": 0,
+      "geolocation_city": 0,
+      "geolocation_state": 0
+    },
+    "products": {
+      "product_id": 0,
+      "product_category_name": 610,
+      "product_name_length": 610,
+      "product_description_length": 610,
+      "product_photos_qty": 610,
+      "product_weight_g": 2,
+      "product_length_cm": 2,
+      "product_height_cm": 2,
+      "product_width_cm": 2
+    },
+    "orders": {
+      "order_id": 0,
+      "customer_id": 0,
+      "order_status": 0,
+      "order_purchase_timestamp": 0,
+      "order_approved_at": 160,
+      "order_delivered_carrier_date": 1783,
+      "order_delivered_customer_date": 2965,
+      "order_estimated_delivery_date": 0
+    },
+    "order_items": {
+      "order_id": 0,
+      "order_item_id": 0,
+      "product_id": 0,
+      "seller_id": 0,
+      "shipping_limit_date": 0,
+      "price": 0,
+      "freight_value": 0
+    },
+    "order_payments": {
+      "order_id": 0,
+      "payment_sequential": 0,
+      "payment_type": 0,
+      "payment_installments": 0,
+      "payment_value": 0
+    },
+    "order_reviews": {
+      "review_id": 0,
+      "order_id": 0,
+      "review_score": 0,
+      "review_comment_title": 87658,
+      "review_comment_message": 58274,
+      "review_creation_date": 0,
+      "review_answer_timestamp": 0
+    }
+  },
+  "cleaning": [
+    "UTF-8 BOM accepted; whitespace stripped; empty fields NULL; product _lenght renamed _length; ZIP padded to five characters",
+    "Only exact geolocation duplicates removed; all other input rows retained; zero rejected rows",
+    "Coordinates stored as DECIMAL with eight fractional digits; derived ZIP uses bbox lat [-34,6], lon [-74,-28], medians and lexical-tie modes",
+    "Latest review: creation timestamp, answer timestamp, review_id descending; missing reviews/delivery dates excluded only from corresponding ratio denominator"
+  ],
+  "oracle": {
+    "gmv": "1027807.28",
+    "merchandise_value": "867953.46",
+    "delivered_order_count": 6159,
+    "aov": "166.8789219029063159603831791",
+    "payment_value": "1066540.75",
+    "repeat_customer_rate": "0.009508196721311475409836065574",
+    "repeat_eligible": 6100,
+    "repeat_customers": 58,
+    "average_review_score": "4.317758536186897565757229211",
+    "review_eligible": 6121,
+    "review_missing": 38,
+    "late_rate": "0.04483430799220272904483430799",
+    "late_eligible": 6156,
+    "late": 276,
+    "late_missing": 3,
+    "sp_gmv": "371820.82",
+    "category_gmv": {
+      "garden_tools": "30517.22",
+      "books_technical": "2461.19",
+      "fashion_bags_accessories": "7271.87",
+      "bed_bath_table": "67850.11",
+      "construction_tools_construction": "17589.95",
+      "sports_leisure": "64342.49",
+      "telephony": "30467.49",
+      "furniture_decor": "56992.74",
+      "office_furniture": "16732.73",
+      "housewares": "76944.79",
+      "health_beauty": "120225.04",
+      "toys": "20360.84",
+      "computers_accessories": "49503.19",
+      "auto": "50763.36",
+      "electronics": "11744.09",
+      "signaling_and_security": "6136.19",
+      "watches_gifts": "104902.50",
+      "perfumery": "23826.62",
+      "musical_instruments": "9309.47",
+      "home_construction": "8199.61",
+      "consoles_games": "9539.14",
+      "baby": "26894.69",
+      "books_general_interest": "4496.16",
+      "industry_commerce_and_business": "5593.90",
+      "stationery": "21451.43",
+      "pet_shop": "22999.92",
+      "art": "2265.73",
+      "home_appliances_2": "13772.17",
+      "luggage_accessories": "7193.09",
+      "kitchen_dining_laundry_garden_furniture": "4527.68",
+      "food_drink": "1121.56",
+      "construction_tools_safety": "2142.90",
+      "cool_stuff": "24405.58",
+      "agro_industry_and_commerce": "7520.33",
+      "furniture_living_room": "8750.18",
+      "home_confort": "3467.50",
+      "costruction_tools_garden": "2520.09",
+      "unknown": "5665.78",
+      "food": "4401.42",
+      "small_appliances": "9181.61",
+      "small_appliances_home_oven_and_coffee": "5171.36",
+      "home_appliances": "6405.16",
+      "construction_tools_lights": "8631.40",
+      "fashion_shoes": "985.44",
+      "audio": "2409.00",
+      "furniture_bedroom": "1838.77",
+      "drinks": "1538.48",
+      "pc_gamer": "457.38",
+      "fixed_telephony": "9658.18",
+      "arts_and_craftmanship": "804.60",
+      "diapers_and_hygiene": "197.89",
+      "air_conditioning": "3137.45",
+      "music": "893.28",
+      "furniture_mattress_and_upholstery": "141.83",
+      "cine_photo": "1291.61",
+      "costruction_tools_tools": "5779.45",
+      "party_supplies": "84.36",
+      "books_imported": "464.04",
+      "computers": "11947.48",
+      "portateis_cozinha_e_preparadores_de_alimentos": "276.08",
+      "fashion_underwear_beach": "141.33",
+      "dvds_blu_ray": "96.88",
+      "christmas_supplies": "661.66",
+      "flowers": "83.36",
+      "market_place": "277.34",
+      "fashion_male_clothing": "295.68",
+      "home_comfort_2": "85.44"
+    },
+    "previous_gmv": "1011978.29",
+    "previous_count": 6099,
+    "previous_aov": "165.9252811936383013608788326",
+    "gmv_change": "15828.99",
+    "gmv_growth": "0.01564163001955308744815069106"
+  },
+  "queries": [
+    {
+      "case": "gmv",
+      "plan": {
+        "metric_ids": [
+          "gmv"
+        ],
+        "dimensions": [],
+        "filters": [],
+        "time_range": {
+          "start": "2018-07-01",
+          "end": "2018-08-01"
+        },
+        "comparison": "none",
+        "sort": "dimension",
+        "top_k": 200,
+        "catalog_version": "v1"
+      },
+      "status": "passed",
+      "table": [
+        {
+          "population_count": 6159,
+          "gmv": "1027807.28",
+          "merchandise_value": "867953.46",
+          "delivered_order_count": 6159,
+          "aov": "166.8789219029063159603831791"
+        }
+      ]
+    },
+    {
+      "case": "merchandise_value",
+      "plan": {
+        "metric_ids": [
+          "merchandise_value"
+        ],
+        "dimensions": [],
+        "filters": [],
+        "time_range": {
+          "start": "2018-07-01",
+          "end": "2018-08-01"
+        },
+        "comparison": "none",
+        "sort": "dimension",
+        "top_k": 200,
+        "catalog_version": "v1"
+      },
+      "status": "passed",
+      "table": [
+        {
+          "population_count": 6159,
+          "gmv": "1027807.28",
+          "merchandise_value": "867953.46",
+          "delivered_order_count": 6159,
+          "aov": "166.8789219029063159603831791"
+        }
+      ]
+    },
+    {
+      "case": "delivered_order_count",
+      "plan": {
+        "metric_ids": [
+          "delivered_order_count"
+        ],
+        "dimensions": [],
+        "filters": [],
+        "time_range": {
+          "start": "2018-07-01",
+          "end": "2018-08-01"
+        },
+        "comparison": "none",
+        "sort": "dimension",
+        "top_k": 200,
+        "catalog_version": "v1"
+      },
+      "status": "passed",
+      "table": [
+        {
+          "population_count": 6159,
+          "gmv": "1027807.28",
+          "merchandise_value": "867953.46",
+          "delivered_order_count": 6159,
+          "aov": "166.8789219029063159603831791"
+        }
+      ]
+    },
+    {
+      "case": "aov",
+      "plan": {
+        "metric_ids": [
+          "aov"
+        ],
+        "dimensions": [],
+        "filters": [],
+        "time_range": {
+          "start": "2018-07-01",
+          "end": "2018-08-01"
+        },
+        "comparison": "none",
+        "sort": "dimension",
+        "top_k": 200,
+        "catalog_version": "v1"
+      },
+      "status": "passed",
+      "table": [
+        {
+          "population_count": 6159,
+          "gmv": "1027807.28",
+          "merchandise_value": "867953.46",
+          "delivered_order_count": 6159,
+          "aov": "166.8789219029063159603831791"
+        }
+      ]
+    },
+    {
+      "case": "payment_value",
+      "plan": {
+        "metric_ids": [
+          "payment_value"
+        ],
+        "dimensions": [],
+        "filters": [],
+        "time_range": {
+          "start": "2018-07-01",
+          "end": "2018-08-01"
+        },
+        "comparison": "none",
+        "sort": "dimension",
+        "top_k": 200,
+        "catalog_version": "v1"
+      },
+      "status": "passed",
+      "table": [
+        {
+          "population_count": 6292,
+          "payment_value": "1066540.75"
+        }
+      ]
+    },
+    {
+      "case": "repeat_customer_rate",
+      "plan": {
+        "metric_ids": [
+          "repeat_customer_rate"
+        ],
+        "dimensions": [],
+        "filters": [],
+        "time_range": {
+          "start": "2018-07-01",
+          "end": "2018-08-01"
+        },
+        "comparison": "none",
+        "sort": "dimension",
+        "top_k": 200,
+        "catalog_version": "v1"
+      },
+      "status": "passed",
+      "table": [
+        {
+          "eligible": 6100,
+          "repeat_customers": "58",
+          "repeat_customer_rate": "0.009508196721311475409836065574"
+        }
+      ]
+    },
+    {
+      "case": "average_review_score",
+      "plan": {
+        "metric_ids": [
+          "average_review_score"
+        ],
+        "dimensions": [],
+        "filters": [],
+        "time_range": {
+          "start": "2018-07-01",
+          "end": "2018-08-01"
+        },
+        "comparison": "none",
+        "sort": "dimension",
+        "top_k": 200,
+        "catalog_version": "v1"
+      },
+      "status": "passed",
+      "table": [
+        {
+          "population_count": 6159,
+          "score_sum": "26429",
+          "eligible": 6121,
+          "missing": "38",
+          "average_review_score": "4.317758536186897565757229211"
+        }
+      ]
+    },
+    {
+      "case": "late_rate",
+      "plan": {
+        "metric_ids": [
+          "late_rate"
+        ],
+        "dimensions": [],
+        "filters": [],
+        "time_range": {
+          "start": "2018-07-01",
+          "end": "2018-08-01"
+        },
+        "comparison": "none",
+        "sort": "dimension",
+        "top_k": 200,
+        "catalog_version": "v1"
+      },
+      "status": "passed",
+      "table": [
+        {
+          "population_count": 6159,
+          "eligible": "6156",
+          "late": "276",
+          "missing": "3",
+          "late_rate": "0.04483430799220272904483430799"
+        }
+      ]
+    },
+    {
+      "case": "sp_gmv",
+      "plan": {
+        "metric_ids": [
+          "gmv"
+        ],
+        "dimensions": [],
+        "filters": [
+          {
+            "field": "state",
+            "operator": "eq",
+            "value": "SP"
+          }
+        ],
+        "time_range": {
+          "start": "2018-07-01",
+          "end": "2018-08-01"
+        },
+        "comparison": "none",
+        "sort": "dimension",
+        "top_k": 200,
+        "catalog_version": "v1"
+      },
+      "status": "passed",
+      "table": [
+        {
+          "population_count": 2715,
+          "gmv": "371820.82",
+          "merchandise_value": "321647.25",
+          "delivered_order_count": 2715,
+          "aov": "136.9505782688766114180478821"
+        }
+      ]
+    },
+    {
+      "case": "category_gmv",
+      "plan": {
+        "metric_ids": [
+          "gmv"
+        ],
+        "dimensions": [
+          "category"
+        ],
+        "filters": [],
+        "time_range": {
+          "start": "2018-07-01",
+          "end": "2018-08-01"
+        },
+        "comparison": "none",
+        "sort": "dimension",
+        "top_k": 200,
+        "catalog_version": "v1"
+      },
+      "status": "passed",
+      "table": [
+        {
+          "category": "agro_industry_and_commerce",
+          "population_count": 26,
+          "gmv": "7520.33",
+          "merchandise_value": "6669.82",
+          "delivered_order_count": 26,
+          "aov": "289.2434615384615384615384615"
+        },
+        {
+          "category": "air_conditioning",
+          "population_count": 15,
+          "gmv": "3137.45",
+          "merchandise_value": "2657.86",
+          "delivered_order_count": 15,
+          "aov": "209.1633333333333333333333333"
+        },
+        {
+          "category": "art",
+          "population_count": 21,
+          "gmv": "2265.73",
+          "merchandise_value": "1843.20",
+          "delivered_order_count": 21,
+          "aov": "107.8919047619047619047619048"
+        },
+        {
+          "category": "arts_and_craftmanship",
+          "population_count": 10,
+          "gmv": "804.60",
+          "merchandise_value": "654.57",
+          "delivered_order_count": 10,
+          "aov": "80.46"
+        },
+        {
+          "category": "audio",
+          "population_count": 21,
+          "gmv": "2409.00",
+          "merchandise_value": "2062.64",
+          "delivered_order_count": 21,
+          "aov": "114.7142857142857142857142857"
+        },
+        {
+          "category": "auto",
+          "population_count": 324,
+          "gmv": "50763.36",
+          "merchandise_value": "43466.79",
+          "delivered_order_count": 324,
+          "aov": "156.6770370370370370370370370"
+        },
+        {
+          "category": "baby",
+          "population_count": 206,
+          "gmv": "26894.69",
+          "merchandise_value": "21834.12",
+          "delivered_order_count": 206,
+          "aov": "130.5567475728155339805825243"
+        },
+        {
+          "category": "bed_bath_table",
+          "population_count": 511,
+          "gmv": "67850.11",
+          "merchandise_value": "54405.23",
+          "delivered_order_count": 511,
+          "aov": "132.7790802348336594911937378"
+        },
+        {
+          "category": "books_general_interest",
+          "population_count": 25,
+          "gmv": "4496.16",
+          "merchandise_value": "4077.45",
+          "delivered_order_count": 25,
+          "aov": "179.8464"
+        },
+        {
+          "category": "books_imported",
+          "population_count": 5,
+          "gmv": "464.04",
+          "merchandise_value": "357.79",
+          "delivered_order_count": 5,
+          "aov": "92.808"
+        },
+        {
+          "category": "books_technical",
+          "population_count": 26,
+          "gmv": "2461.19",
+          "merchandise_value": "1994.93",
+          "delivered_order_count": 26,
+          "aov": "94.66115384615384615384615385"
+        },
+        {
+          "category": "christmas_supplies",
+          "population_count": 8,
+          "gmv": "661.66",
+          "merchandise_value": "509.56",
+          "delivered_order_count": 8,
+          "aov": "82.7075"
+        },
+        {
+          "category": "cine_photo",
+          "population_count": 7,
+          "gmv": "1291.61",
+          "merchandise_value": "1178.54",
+          "delivered_order_count": 7,
+          "aov": "184.5157142857142857142857143"
+        },
+        {
+          "category": "computers",
+          "population_count": 8,
+          "gmv": "11947.48",
+          "merchandise_value": "11239.00",
+          "delivered_order_count": 8,
+          "aov": "1493.435"
+        },
+        {
+          "category": "computers_accessories",
+          "population_count": 381,
+          "gmv": "49503.19",
+          "merchandise_value": "41063.31",
+          "delivered_order_count": 381,
+          "aov": "129.9296325459317585301837270"
+        },
+        {
+          "category": "consoles_games",
+          "population_count": 49,
+          "gmv": "9539.14",
+          "merchandise_value": "8519.11",
+          "delivered_order_count": 49,
+          "aov": "194.6763265306122448979591837"
+        },
+        {
+          "category": "construction_tools_construction",
+          "population_count": 98,
+          "gmv": "17589.95",
+          "merchandise_value": "15237.47",
+          "delivered_order_count": 98,
+          "aov": "179.4892857142857142857142857"
+        },
+        {
+          "category": "construction_tools_lights",
+          "population_count": 40,
+          "gmv": "8631.40",
+          "merchandise_value": "7249.61",
+          "delivered_order_count": 40,
+          "aov": "215.785"
+        },
+        {
+          "category": "construction_tools_safety",
+          "population_count": 15,
+          "gmv": "2142.90",
+          "merchandise_value": "1888.95",
+          "delivered_order_count": 15,
+          "aov": "142.86"
+        },
+        {
+          "category": "cool_stuff",
+          "population_count": 113,
+          "gmv": "24405.58",
+          "merchandise_value": "21152.01",
+          "delivered_order_count": 113,
+          "aov": "215.9785840707964601769911504"
+        },
+        {
+          "category": "costruction_tools_garden",
+          "population_count": 19,
+          "gmv": "2520.09",
+          "merchandise_value": "1922.66",
+          "delivered_order_count": 19,
+          "aov": "132.6363157894736842105263158"
+        },
+        {
+          "category": "costruction_tools_tools",
+          "population_count": 10,
+          "gmv": "5779.45",
+          "merchandise_value": "5501.20",
+          "delivered_order_count": 10,
+          "aov": "577.945"
+        },
+        {
+          "category": "diapers_and_hygiene",
+          "population_count": 3,
+          "gmv": "197.89",
+          "merchandise_value": "121.00",
+          "delivered_order_count": 3,
+          "aov": "65.96333333333333333333333333"
+        },
+        {
+          "category": "drinks",
+          "population_count": 16,
+          "gmv": "1538.48",
+          "merchandise_value": "1260.17",
+          "delivered_order_count": 16,
+          "aov": "96.155"
+        },
+        {
+          "category": "dvds_blu_ray",
+          "population_count": 1,
+          "gmv": "96.88",
+          "merchandise_value": "83.99",
+          "delivered_order_count": 1,
+          "aov": "96.88"
+        },
+        {
+          "category": "electronics",
+          "population_count": 142,
+          "gmv": "11744.09",
+          "merchandise_value": "9270.95",
+          "delivered_order_count": 142,
+          "aov": "82.70485915492957746478873239"
+        },
+        {
+          "category": "fashion_bags_accessories",
+          "population_count": 74,
+          "gmv": "7271.87",
+          "merchandise_value": "6071.07",
+          "delivered_order_count": 74,
+          "aov": "98.26851351351351351351351351"
+        },
+        {
+          "category": "fashion_male_clothing",
+          "population_count": 5,
+          "gmv": "295.68",
+          "merchandise_value": "208.70",
+          "delivered_order_count": 5,
+          "aov": "59.136"
+        },
+        {
+          "category": "fashion_shoes",
+          "population_count": 5,
+          "gmv": "985.44",
+          "merchandise_value": "820.19",
+          "delivered_order_count": 5,
+          "aov": "197.088"
+        },
+        {
+          "category": "fashion_underwear_beach",
+          "population_count": 2,
+          "gmv": "141.33",
+          "merchandise_value": "109.80",
+          "delivered_order_count": 2,
+          "aov": "70.665"
+        },
+        {
+          "category": "fixed_telephony",
+          "population_count": 8,
+          "gmv": "9658.18",
+          "merchandise_value": "9319.39",
+          "delivered_order_count": 8,
+          "aov": "1207.2725"
+        },
+        {
+          "category": "flowers",
+          "population_count": 2,
+          "gmv": "83.36",
+          "merchandise_value": "47.99",
+          "delivered_order_count": 2,
+          "aov": "41.68"
+        },
+        {
+          "category": "food",
+          "population_count": 59,
+          "gmv": "4401.42",
+          "merchandise_value": "3378.17",
+          "delivered_order_count": 59,
+          "aov": "74.60033898305084745762711864"
+        },
+        {
+          "category": "food_drink",
+          "population_count": 14,
+          "gmv": "1121.56",
+          "merchandise_value": "778.73",
+          "delivered_order_count": 14,
+          "aov": "80.11142857142857142857142857"
+        },
+        {
+          "category": "furniture_bedroom",
+          "population_count": 7,
+          "gmv": "1838.77",
+          "merchandise_value": "1386.90",
+          "delivered_order_count": 7,
+          "aov": "262.6814285714285714285714286"
+        },
+        {
+          "category": "furniture_decor",
+          "population_count": 343,
+          "gmv": "56992.74",
+          "merchandise_value": "45393.59",
+          "delivered_order_count": 343,
+          "aov": "166.1595918367346938775510204"
+        },
+        {
+          "category": "furniture_living_room",
+          "population_count": 49,
+          "gmv": "8750.18",
+          "merchandise_value": "6706.64",
+          "delivered_order_count": 49,
+          "aov": "178.5751020408163265306122449"
+        },
+        {
+          "category": "furniture_mattress_and_upholstery",
+          "population_count": 1,
+          "gmv": "141.83",
+          "merchandise_value": "129.90",
+          "delivered_order_count": 1,
+          "aov": "141.83"
+        },
+        {
+          "category": "garden_tools",
+          "population_count": 152,
+          "gmv": "30517.22",
+          "merchandise_value": "25639.88",
+          "delivered_order_count": 152,
+          "aov": "200.7711842105263157894736842"
+        },
+        {
+          "category": "health_beauty",
+          "population_count": 699,
+          "gmv": "120225.04",
+          "merchandise_value": "103524.22",
+          "delivered_order_count": 699,
+          "aov": "171.9957653791130185979971388"
+        },
+        {
+          "category": "home_appliances",
+          "population_count": 78,
+          "gmv": "6405.16",
+          "merchandise_value": "5173.03",
+          "delivered_order_count": 78,
+          "aov": "82.11743589743589743589743590"
+        },
+        {
+          "category": "home_appliances_2",
+          "population_count": 22,
+          "gmv": "13772.17",
+          "merchandise_value": "12597.32",
+          "delivered_order_count": 22,
+          "aov": "626.0077272727272727272727273"
+        },
+        {
+          "category": "home_comfort_2",
+          "population_count": 2,
+          "gmv": "85.44",
+          "merchandise_value": "38.70",
+          "delivered_order_count": 2,
+          "aov": "42.72"
+        },
+        {
+          "category": "home_confort",
+          "population_count": 23,
+          "gmv": "3467.50",
+          "merchandise_value": "2906.48",
+          "delivered_order_count": 23,
+          "aov": "150.7608695652173913043478261"
+        },
+        {
+          "category": "home_construction",
+          "population_count": 57,
+          "gmv": "8199.61",
+          "merchandise_value": "6700.25",
+          "delivered_order_count": 57,
+          "aov": "143.8528070175438596491228070"
+        },
+        {
+          "category": "housewares",
+          "population_count": 462,
+          "gmv": "76944.79",
+          "merchandise_value": "62583.30",
+          "delivered_order_count": 462,
+          "aov": "166.5471645021645021645021645"
+        },
+        {
+          "category": "industry_commerce_and_business",
+          "population_count": 13,
+          "gmv": "5593.90",
+          "merchandise_value": "4697.21",
+          "delivered_order_count": 13,
+          "aov": "430.30"
+        },
+        {
+          "category": "kitchen_dining_laundry_garden_furniture",
+          "population_count": 20,
+          "gmv": "4527.68",
+          "merchandise_value": "3736.95",
+          "delivered_order_count": 20,
+          "aov": "226.384"
+        },
+        {
+          "category": "luggage_accessories",
+          "population_count": 53,
+          "gmv": "7193.09",
+          "merchandise_value": "5821.72",
+          "delivered_order_count": 53,
+          "aov": "135.7186792452830188679245283"
+        },
+        {
+          "category": "market_place",
+          "population_count": 4,
+          "gmv": "277.34",
+          "merchandise_value": "186.78",
+          "delivered_order_count": 4,
+          "aov": "69.335"
+        },
+        {
+          "category": "music",
+          "population_count": 3,
+          "gmv": "893.28",
+          "merchandise_value": "849.30",
+          "delivered_order_count": 3,
+          "aov": "297.76"
+        },
+        {
+          "category": "musical_instruments",
+          "population_count": 32,
+          "gmv": "9309.47",
+          "merchandise_value": "7871.93",
+          "delivered_order_count": 32,
+          "aov": "290.9209375"
+        },
+        {
+          "category": "office_furniture",
+          "population_count": 62,
+          "gmv": "16732.73",
+          "merchandise_value": "13225.28",
+          "delivered_order_count": 62,
+          "aov": "269.8827419354838709677419355"
+        },
+        {
+          "category": "party_supplies",
+          "population_count": 2,
+          "gmv": "84.36",
+          "merchandise_value": "57.50",
+          "delivered_order_count": 2,
+          "aov": "42.18"
+        },
+        {
+          "category": "pc_gamer",
+          "population_count": 1,
+          "gmv": "457.38",
+          "merchandise_value": "438.00",
+          "delivered_order_count": 1,
+          "aov": "457.38"
+        },
+        {
+          "category": "perfumery",
+          "population_count": 168,
+          "gmv": "23826.62",
+          "merchandise_value": "20645.97",
+          "delivered_order_count": 168,
+          "aov": "141.8251190476190476190476190"
+        },
+        {
+          "category": "pet_shop",
+          "population_count": 138,
+          "gmv": "22999.92",
+          "merchandise_value": "19343.85",
+          "delivered_order_count": 138,
+          "aov": "166.6660869565217391304347826"
+        },
+        {
+          "category": "portateis_cozinha_e_preparadores_de_alimentos",
+          "population_count": 7,
+          "gmv": "276.08",
+          "merchandise_value": "172.03",
+          "delivered_order_count": 7,
+          "aov": "39.44"
+        },
+        {
+          "category": "signaling_and_security",
+          "population_count": 19,
+          "gmv": "6136.19",
+          "merchandise_value": "3785.19",
+          "delivered_order_count": 19,
+          "aov": "322.9573684210526315789473684"
+        },
+        {
+          "category": "small_appliances",
+          "population_count": 35,
+          "gmv": "9181.61",
+          "merchandise_value": "8161.35",
+          "delivered_order_count": 35,
+          "aov": "262.3317142857142857142857143"
+        },
+        {
+          "category": "small_appliances_home_oven_and_coffee",
+          "population_count": 14,
+          "gmv": "5171.36",
+          "merchandise_value": "4699.67",
+          "delivered_order_count": 14,
+          "aov": "369.3828571428571428571428571"
+        },
+        {
+          "category": "sports_leisure",
+          "population_count": 410,
+          "gmv": "64342.49",
+          "merchandise_value": "54015.89",
+          "delivered_order_count": 410,
+          "aov": "156.9329024390243902439024390"
+        },
+        {
+          "category": "stationery",
+          "population_count": 168,
+          "gmv": "21451.43",
+          "merchandise_value": "17217.19",
+          "delivered_order_count": 168,
+          "aov": "127.6870833333333333333333333"
+        },
+        {
+          "category": "telephony",
+          "population_count": 202,
+          "gmv": "30467.49",
+          "merchandise_value": "26492.68",
+          "delivered_order_count": 202,
+          "aov": "150.8291584158415841584158416"
+        },
+        {
+          "category": "toys",
+          "population_count": 148,
+          "gmv": "20360.84",
+          "merchandise_value": "17022.00",
+          "delivered_order_count": 148,
+          "aov": "137.5732432432432432432432432"
+        },
+        {
+          "category": "unknown",
+          "population_count": 42,
+          "gmv": "5665.78",
+          "merchandise_value": "4612.00",
+          "delivered_order_count": 42,
+          "aov": "134.8995238095238095238095238"
+        },
+        {
+          "category": "watches_gifts",
+          "population_count": 507,
+          "gmv": "104902.50",
+          "merchandise_value": "95164.79",
+          "delivered_order_count": 507,
+          "aov": "206.9082840236686390532544379"
+        }
+      ]
+    },
+    {
+      "case": "june_comparison",
+      "plan": {
+        "metric_ids": [
+          "gmv"
+        ],
+        "dimensions": [],
+        "filters": [],
+        "time_range": {
+          "start": "2018-07-01",
+          "end": "2018-08-01"
+        },
+        "comparison": "previous_period",
+        "sort": "dimension",
+        "top_k": 200,
+        "catalog_version": "v1"
+      },
+      "status": "passed",
+      "table": [
+        {
+          "population_count": 6159,
+          "gmv": "1027807.28",
+          "merchandise_value": "867953.46",
+          "delivered_order_count": 6159,
+          "aov": "166.8789219029063159603831791",
+          "gmv_previous": "1011978.29",
+          "gmv_change": "15828.99",
+          "gmv_growth": "0.01564163001955308744815069106"
+        }
+      ]
+    }
+  ],
+  "query_count": 11,
+  "upstream_monthly_checks": [
+    {
+      "month": "2018-06",
+      "gmv": "1011978.29",
+      "orders": "6099",
+      "aov": "165.93",
+      "status": "passed"
+    },
+    {
+      "month": "2018-07",
+      "gmv": "1027807.28",
+      "orders": "6159",
+      "aov": "166.88",
+      "status": "passed"
+    }
+  ],
+  "upstream_reference": "results/SQL_REPORT.md links results/sql/01_monthly_revenue.csv; same delivered purchase-calendar-month GMV, rounded AOV",
+  "data_quality": {
+    "orders_without_payments": 1,
+    "orders_without_items": 775,
+    "orders_without_reviews": 768,
+    "geolocation_duplicate_rows_removed": 261831,
+    "geolocation_points_excluded_from_zip_bbox": 27,
+    "untranslated_nonnull_categories": [
+      "pc_gamer",
+      "portateis_cozinha_e_preparadores_de_alimentos"
+    ],
+    "rejected_rows": 0
+  }
+}

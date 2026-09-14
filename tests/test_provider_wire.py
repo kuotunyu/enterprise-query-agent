@@ -1,3 +1,4 @@
+from enterprise_query.costs import CostLedger
 """Official SDK wire parsing through local MockTransport, with no network calls."""
 import json
 import httpx
@@ -7,7 +8,7 @@ from enterprise_query.providers import OpenAIPlanner
 from tests.test_service import req
 
 @pytest.mark.parametrize('kind',['valid','invalid','unknown','refusal'])
-def test_structured_output_wire(kind):
+def test_structured_output_wire(kind,tmp_path):
     decision={'action':'clarify','message':'請指定月份','options':['2018年7月'],'plan':None}
     if kind=='unknown': decision={'action':'query','message':'plan','options':[],'plan':{'metric_ids':['unknown_metric'],'time_range':{'start':'2018-07-01','end':'2018-08-01'}}}
     content={'type':'output_text','text':'{' if kind=='invalid' else json.dumps(decision),'annotations':[]}
@@ -15,8 +16,9 @@ def test_structured_output_wire(kind):
     seen=[]
     def transport(request):
         seen.append(json.loads(request.content))
-        return httpx.Response(200,json={'id':'resp_mock','object':'response','created_at':0,'model':'explicit-test-model','status':'completed','output':[{'id':'msg_mock','type':'message','role':'assistant','status':'completed','content':[content]}],'usage':{'input_tokens':12,'output_tokens':7,'total_tokens':19,'input_tokens_details':{'cached_tokens':0},'output_tokens_details':{'reasoning_tokens':0}},'parallel_tool_calls':False,'tool_choice':'auto','tools':[]})
-    planner=OpenAIPlanner('explicit-test-model','offline-test-key')
+        return httpx.Response(200,json={'id':'resp_mock','object':'response','created_at':0,'model':'gpt-5.6-luna','status':'completed','output':[{'id':'msg_mock','type':'message','role':'assistant','status':'completed','content':[content]}],'usage':{'input_tokens':12,'output_tokens':7,'total_tokens':19,'input_tokens_details':{'cached_tokens':0},'output_tokens_details':{'reasoning_tokens':0}},'parallel_tool_calls':False,'tool_choice':'auto','tools':[]})
+    CostLedger.initialize(tmp_path/'cost.json',{'development':'1','research':'1'})
+    planner=OpenAIPlanner('gpt-5.6-luna','offline-test-key',CostLedger(tmp_path/'cost.json','development'))
     planner.client=OpenAI(api_key='offline-test-key',http_client=httpx.Client(transport=httpx.MockTransport(transport)),max_retries=0)
     if kind=='valid':
         assert planner.decide(req('GMV'),{}).action=='clarify'
@@ -25,17 +27,18 @@ def test_structured_output_wire(kind):
     else:
         with pytest.raises(ValueError): planner.decide(req('GMV'),{})
         assert planner.last_usage['tokens']['total_tokens']==19
-    assert len(seen)==1 and seen[0]['model']=='explicit-test-model'
+    assert len(seen)==1 and seen[0]['model']=='gpt-5.6-luna'
     assert seen[0]['text']['format']['type']=='json_schema'
     assert 'review_comment_message' not in json.dumps(seen)
 
-def test_clarification_reply_is_retained_across_structured_clarify_turns():
+def test_clarification_reply_is_retained_across_structured_clarify_turns(tmp_path):
     seen=[]
     def transport(request):
         seen.append(json.loads(request.content))
         decision={'action':'clarify','message':'請指定月份','options':['2018年7月'],'plan':None}
-        return httpx.Response(200,json={'id':'resp_mock','object':'response','created_at':0,'model':'explicit-test-model','status':'completed','output':[{'id':'msg_mock','type':'message','role':'assistant','status':'completed','content':[{'type':'output_text','text':json.dumps(decision),'annotations':[]}]}],'usage':{'input_tokens':12,'output_tokens':7,'total_tokens':19,'input_tokens_details':{'cached_tokens':0},'output_tokens_details':{'reasoning_tokens':0}},'parallel_tool_calls':False,'tool_choice':'auto','tools':[]})
-    planner=OpenAIPlanner('explicit-test-model','offline-test-key')
+        return httpx.Response(200,json={'id':'resp_mock','object':'response','created_at':0,'model':'gpt-5.6-luna','status':'completed','output':[{'id':'msg_mock','type':'message','role':'assistant','status':'completed','content':[{'type':'output_text','text':json.dumps(decision),'annotations':[]}]}],'usage':{'input_tokens':12,'output_tokens':7,'total_tokens':19,'input_tokens_details':{'cached_tokens':0},'output_tokens_details':{'reasoning_tokens':0}},'parallel_tool_calls':False,'tool_choice':'auto','tools':[]})
+    CostLedger.initialize(tmp_path/'cost.json',{'development':'1','research':'1'})
+    planner=OpenAIPlanner('gpt-5.6-luna','offline-test-key',CostLedger(tmp_path/'cost.json','development'))
     planner.client=OpenAI(api_key='offline-test-key',http_client=httpx.Client(transport=httpx.MockTransport(transport)),max_retries=0)
     memory={}
     first=req('營收','含運 GMV')

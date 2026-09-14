@@ -145,7 +145,15 @@ def verify_destination(cursor):
     if cursor.fetchone()!=('eqa_v1',): raise RuntimeError('Destination EQA marker mismatch')
     return dict(database=database,server_hostname=hostname,server_port=port,mysql_version=version)
 
-def bootstrap(csv_dir=None,variant='base'):
+def verify_dataset_replacement(cursor, dataset):
+    """Synthetic fixture resets remain allowed; real snapshots cannot be replaced."""
+    cursor.execute("SELECT value_text FROM eqa_metadata WHERE key_name IN ('dataset_id','protected_dataset_id') ORDER BY key_name DESC LIMIT 1")
+    row = cursor.fetchone()
+    if row and row[0] not in ('loading', dataset) and not row[0].startswith('synthetic-v1'):
+        raise RuntimeError('Refusing to replace an existing real dataset with another dataset')
+
+
+def bootstrap(csv_dir=None,variant='base',manifest_path=None):
     import pymysql
     host=os.getenv('EQA_DB_HOST','127.0.0.1'); port=int(os.getenv('EQA_DB_PORT','3307'))
     if host not in ('127.0.0.1','localhost') or port==3306: raise RuntimeError('Bootstrap requires a separate loopback MySQL port (default 3307)')
@@ -157,6 +165,7 @@ def bootstrap(csv_dir=None,variant='base'):
     try:
         with conn.cursor() as cur:
             identity=verify_destination(cur)
+            verify_dataset_replacement(cur, dataset)
             cur.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='eqa_v1' AND table_name='orders'")
             if cur.fetchone()[0]==0:
                 for statement in (ROOT/'db/schema.sql').read_text(encoding='utf-8-sig').split(';'):
@@ -164,6 +173,8 @@ def bootstrap(csv_dir=None,variant='base'):
             for statement in (ROOT/'db/views.sql').read_text(encoding='utf-8-sig').split(';'):
                 if statement.strip(): cur.execute(statement)
             # Mark loading before changing data; a failed import stays unusable.
+            if csv_dir:
+                cur.execute("REPLACE INTO eqa_metadata VALUES ('protected_dataset_id',%s)",(dataset,))
             cur.execute("REPLACE INTO eqa_metadata VALUES ('dataset_id','loading')")
             conn.commit()
             cur.execute('DELETE FROM geolocation_zip')
@@ -190,14 +201,15 @@ def bootstrap(csv_dir=None,variant='base'):
                 cur.execute(f'SELECT COUNT(*) FROM `{table}`'); counts[table]=cur.fetchone()[0]
     finally: conn.close()
     manifest={**metadata,'kind':'local_olist' if csv_dir else 'synthetic','variant':variant,'files':files,'row_counts':counts,'identity':identity,'fixture_sha256':hashlib.sha256(json.dumps(data,sort_keys=True,default=str).encode()).hexdigest()}
-    target=ROOT/'.local/dataset-manifest.json'; target.parent.mkdir(exist_ok=True)
+    target=Path(manifest_path) if manifest_path else ROOT/'.local/dataset-manifest.json'; target.parent.mkdir(parents=True,exist_ok=True)
     target.write_text(json.dumps(manifest,indent=2,default=str),encoding='utf-8')
-    print(json.dumps({'dataset_id':dataset,'row_counts':counts,'manifest':'.local/dataset-manifest.json'},indent=2))
+    print(json.dumps({'dataset_id':dataset,'row_counts':counts,'manifest':str(target)},indent=2))
     return manifest
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--csv-dir',type=Path)
     parser.add_argument('--variant',choices=['base','split_payment','older_review'],default='base')
+    parser.add_argument('--manifest',type=Path)
     args=parser.parse_args()
-    bootstrap(args.csv_dir,args.variant)
+    bootstrap(args.csv_dir,args.variant,args.manifest)

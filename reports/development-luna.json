@@ -1,0 +1,113 @@
+{
+  "purpose": "Public development verification and failure preservation, not unseen evaluation or model leaderboard",
+  "model": "gpt-5.6-luna",
+  "runs": [
+    {
+      "run_id": "luna-dev-001",
+      "model": "gpt-5.6-luna",
+      "source_tree_sha256": "aafec51ea9647d074c5d9ce6349bb57b591ce2affc74ec11247c0b83552676a1",
+      "prompt_sha256": {
+        "A": "28eb42c5e4e0e56abd69194b2f32c214cd6957829c6d7c69797b62285d35691a",
+        "B": "539485ab9e7699b3e8f0655a654ab144d3fe783990a1d99d50783fe3fd92cba9",
+        "C": "881476e1486fce1dfa7464f4b950171eb9a696575eb49bfa771aef19950debec"
+      },
+      "dataset_id": "olist-local-969f3ae180928f54",
+      "completion": "run_stopped",
+      "terminal_count": 18,
+      "unstarted_count": 60,
+      "status_counts": {
+        "A:answered": 6,
+        "B:answered": 3,
+        "B:provider_error": 1,
+        "B:rejected": 2,
+        "C:answered": 4,
+        "C:rejected": 2
+      },
+      "api_attempts": 18,
+      "charged_upper_usd": "0.01480095",
+      "frozen_rate_usage_estimate_usd": "0.00704380",
+      "unknown_cost_calls": 0,
+      "independent_reference_checked_terminals": 10,
+      "independent_reference_mismatches": []
+    },
+    {
+      "run_id": "luna-dev-002",
+      "model": "gpt-5.6-luna",
+      "source_tree_sha256": "0af0f8e7fccc0e378cf49fe76eb7790fbe3e114e861983b10f0ccb150375111d",
+      "prompt_sha256": {
+        "A": "0d7a1220c0c5d6f28401573661116a1e59eceb2f5bd2da2f7075c8ca94bb8e95",
+        "B": "b82f564e44b237b6d64152efbd5d6883a1285ccb63b240e3144cb35e2b123915",
+        "C": "971532ab9fe900382643b3c5fb273e04fce52b0e9cfc57a4c3e591f271312827"
+      },
+      "dataset_id": "olist-local-969f3ae180928f54",
+      "completion": "run_stopped",
+      "terminal_count": 20,
+      "unstarted_count": 58,
+      "status_counts": {
+        "A:answered": 7,
+        "B:answered": 5,
+        "B:execution_error": 1,
+        "B:provider_error": 1,
+        "C:answered": 5,
+        "C:provider_error": 1
+      },
+      "api_attempts": 20,
+      "charged_upper_usd": "0.01657830",
+      "frozen_rate_usage_estimate_usd": "0.00759817",
+      "unknown_cost_calls": 0,
+      "independent_reference_checked_terminals": 14,
+      "independent_reference_mismatches": [
+        {
+          "case_id": "DEV-03",
+          "method": "B",
+          "status": "answered",
+          "independent_category_match": false
+        }
+      ]
+    },
+    {
+      "run_id": "luna-dev-003",
+      "model": "gpt-5.6-luna",
+      "source_tree_sha256": "ad65b21c762b14d6b2b66db8249f593c5eead0a6819bfcda2377064212c1dc09",
+      "prompt_sha256": {
+        "A": "0d7a1220c0c5d6f28401573661116a1e59eceb2f5bd2da2f7075c8ca94bb8e95",
+        "B": "b82f564e44b237b6d64152efbd5d6883a1285ccb63b240e3144cb35e2b123915",
+        "C": "971532ab9fe900382643b3c5fb273e04fce52b0e9cfc57a4c3e591f271312827"
+      },
+      "dataset_id": "olist-local-969f3ae180928f54",
+      "completion": "run_completed",
+      "terminal_count": 78,
+      "unstarted_count": 0,
+      "status_counts": {
+        "A:answered": 18,
+        "A:rejected": 1,
+        "A:unsupported": 7,
+        "B:answered": 14,
+        "B:provider_error": 1,
+        "B:rejected": 5,
+        "B:unsupported": 6,
+        "C:answered": 20,
+        "C:empty": 1,
+        "C:unsupported": 5
+      },
+      "api_attempts": 84,
+      "charged_upper_usd": "0.06766100",
+      "frozen_rate_usage_estimate_usd": "0.02349691",
+      "unknown_cost_calls": 0,
+      "independent_reference_checked_terminals": 38,
+      "independent_reference_mismatches": []
+    }
+  ],
+  "aggregate_charged_upper_usd": "0.09904025",
+  "lessons": [
+    "SQLGlot DATE_FORMAT internal cast was incorrectly rejected; fixed after first run and independently verified against MySQL.",
+    "Runner originally stopped on model validation/parameter errors; explicit model-output boundaries now retain failures and continue.",
+    "B category NULL labeling mismatch was retained; no SQL repair was performed."
+  ],
+  "limitations": [
+    "26 public development questions reused across methods and rounds; no independent-sample or unseen-accuracy claim.",
+    "Status answered does not establish semantic correctness. Independent CSV reference check covers selected scalar and category facts only.",
+    "Token costs are estimates from frozen rates; invoice cost unavailable.",
+    "Original provider traces and full outcomes remain private; no secrets or raw CSV included."
+  ]
+}

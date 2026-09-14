@@ -2,7 +2,9 @@
 
 以中文詢問歷史 Olist 電商資料，先確認業務口徑，再執行受控 SQL，呈現可核對的 BRL 數字、結果表與證據。
 
-本機 M1–M3 工程與 deterministic mock 流程；正式模型能力与三方法研究屬 M4，尚未執行。實際驗證見 [工程狀態](docs/status.md)。沒有已發布的 GitHub repository 或 release。
+本機工作台已接入真實 Olist 歷史資料與 GPT-5.6 Luna，開發驗證與一次正式比較均已完成。40原題嚴格契約成功數為 A固定模板30、B直接SQL23、C業務計畫31；另有24個相依變體。C僅比A多一題，不能推論一般性優勢，共通支援子集以A較穩定。完整結果與評分限制見 [正式報告](reports/formal-luna.md)，工程紀錄見 [工程狀態](docs/status.md)。尚未發布GitHub repository或release。
+
+**開發請只從 [施工總計畫](PROJECT_PLAN.md) 開始。** 它統一目前進度、下一步、驗收與結案條件；其他設計文件按需查閱。
 
 ## 啟動
 
@@ -16,7 +18,7 @@ uv run --env-file .local/bootstrap.env python scripts/bootstrap_data.py
 uv run --env-file .local/runtime.env python scripts/serve.py
 ```
 
-開啟 [本機工作台](http://127.0.0.1:8010)。已載入資料時，日常啟動只需 Compose 與最後一行；bootstrap 會重載本專案合成資料，不要在查詢時重載。
+開啟 [本機工作台](http://127.0.0.1:8010)。以上建立可重現的合成環境；已有真資料環境的本機啟動命令見 [工程狀態](docs/status.md)。已載入資料時，日常啟動只需 Compose 與最後一行；不要在查詢時重載資料。
 
 `configure_local.py` 建立隨機密碼，重跑保留既有設定。`.local/bootstrap.env` 供建庫／匯入；Web **只能使用 `.local/runtime.env`**。不要把 bootstrap 密碼放進 Web 環境。
 
@@ -24,12 +26,14 @@ MySQL 使用專案 `eqa_v1`、專用 volume、loopback port **3307**；Web 使�
 
 ## 使用
 
-1. 畫面標示 mock、資料版本、實際資料日期、coverage policy 與基準日期。
+1. 先確認畫面標示的 mock／openai 模式、資料版本、實際資料日期、coverage policy 與基準日期。
 2. 選六個開發示例或輸入中文問題，例如「2018年7月營收多少」。
 3. 營收會澄清含運 GMV／不含運商品金額／全部狀態付款。同任務保留已確認口徑；「新任務」重新確認。
 4. 查看數字、分母／缺值、結果表與限制；展開證據可查看 SQL、參數、型別、結果列、版本、hash 與用量。
 
 基線手算：7 月 GMV **242.00 BRL**、商品金額 **220.00 BRL**、全部狀態付款 **459.00 BRL**、3 筆 delivered 訂單、AOV **80.67 BRL**、回購／延遲率各 **50%**、最新評論均分 **4**。這是公開合成開發案例，不是模型或真實商業成績。
+
+真資料2018年7月 delivered GMV獨立核對值為 **1,027,807.28 BRL**，訂單6,159筆。真模型操作截圖與兩分鐘展示流程見 [使用與示範](docs/demo.md)。單次示範成功不等於研究成功率。
 
 Mock 是有限 deterministic 規則，不是任意中文理解模型，示範以單月問題為主。明示日區間或跨月而無法解讀時會 unsupported，不默默改成整月；底層 QueryPlan 仍支援精確半開日期區間。不識別或無來源支持的問題會澄清／unsupported。品類與賣家的訂單可能重疊，不能加總分組訂單數。
 
@@ -43,9 +47,11 @@ uv run pytest -m "not integration and not ui" -q
 $env:EQA_INTEGRATION = "1"
 uv run --env-file .local/runtime.env pytest -m "not ui" -q
 
-# 另一個終端保持 Web 運行，再執行瀏覽器與 26 題中文 mock
+# 先在另一個終端啟動合成測試 Web（與 8010 真資料工作台分開）：
+# uv run --env-file .local/runtime.env python scripts/serve.py --port 8011
+# 再執行瀏覽器與 26 題中文 mock；此套件核對合成手算值
 uv run playwright install chromium
-$env:EQA_WEB_URL = "http://127.0.0.1:8010"
+$env:EQA_WEB_URL = "http://127.0.0.1:8011"
 uv run --env-file .local/runtime.env pytest -q
 ```
 
@@ -55,7 +61,7 @@ uv run --env-file .local/runtime.env pytest -q
 
 中文問題 → PlannerDecision → QueryPlan 驗證 → compiler → SQLGlot AST policy → SELECT-only MySQL executor → Decimal facts → UI。
 
-- 8 個版本化指標與有限維度／filter。模型沒有 raw SQL escape hatch、shell 或管理員工具。
+- 8 個版本化指標與有限維度／filter。工作台 C 方法沒有 raw SQL escape hatch；比較工具 B 方法產生的 SQL 仍經相同 AST policy 與 SELECT-only executor。所有方法均沒有 shell 或管理員工具。
 - 共用 executor 拒絕寫入、多語句、外部 schema、檔案／未知函式、變數、鎖與可覆寫時限的 hints。
 - 每任務最多 2 輪澄清、3 次規劃呼叫、3 條業務 SELECT；每 SQL 5 秒、實際處理 60 秒、結果 200 列。等待澄清不計處理時間。
 - 聚合先統一正確粒度；Decimal、日期半開區間、來源 DATETIME 不換時區。截斷比較拒絕推算完整分組變化。
@@ -63,8 +69,23 @@ uv run --env-file .local/runtime.env pytest -q
 
 來源：[kuotunyu/mysql-ecommerce-analytics](https://github.com/kuotunyu/mysql-ecommerce-analytics)，commit `619ad706c35951bd6b811ac56765d6ad097ddbaa`。保留 [來源檔案雜湊](provenance/source-manifest.json)、[MIT 授權](provenance/UPSTREAM_LICENSE) 與 [ETL 說明](provenance/README.md)。九張來源表之外包含衍生 geolocation_zip 與兩個 views。
 
-可選真實 CSV 匯入（本次未執行）：`uv run --env-file .local/bootstrap.env python scripts/bootstrap_data.py --csv-dir <本機CSV目錄>`。來源唯讀，核對目標 marker，保留 SHA-256／row counts／ETL 版本，manifest 寫在 `.local/dataset-manifest.json`。匯入後將 runtime env 的 EQA_DATASET_ID 設成該 manifest 的值，再重啟 Web。原始 CSV、secrets、本機身分與未審查 traces 不提交。
+真實 CSV 使用另一個 Compose project、loopback port 與專用 volume，bootstrap/runtime 設定分離。匯入參數為 `--csv-dir <本機CSV目錄> --manifest <本機manifest檔>`；來源唯讀，核對目標 marker，保留 SHA-256／實際 DB row counts／ETL 版本。已載入真資料的庫拒絕被合成資料或另一個 snapshot 覆寫。匯入後 runtime 的 `EQA_DATASET_ID` 必須符合 manifest，再啟動 Web。原始 CSV、secrets、本機身分與未審查 traces 不提交。
 
 ## M4 交接
 
-已有單一 OpenAI structured-output adapter，預設不啟用付費；即使環境有 key 仍走 mock。正式 model 與預算尚未決定，詳見 [M4 交接](docs/m4-handoff.md)。本次沒有保留題、付費 API、部署或 GitHub 發布。
+已完成 A 固定模板、B 直接 SQL、C 業務計畫三種 structured-output adapter 與共用離線 runner。`scripts/run_comparison.py --run-id <新名稱> --dataset-manifest <本機manifest>` 固定使用 26 個公開開發問題、預設跑 mock；紀錄寫入 `.local/comparison-runs`，拒绝覆寫既有 run，付費開發另需明確 `--paid`、`EQA_ENABLE_PAID_API=1`、已批准帳本與本機 key。完整命令、真資料身分與驗證結果見 [工程狀態](docs/status.md)。
+
+工作台預設不啟用付費；即使環境有 key 仍走 mock。此專案已核准 `gpt-5.6-luna` 的開發 US$25／正式研究 US$20 獨立上限，兩階段執行完成，含工作台驗證的費用保守上界合計US$0.29124715，精確帳單不可得。新的使用者需自行設定並批准本機額度。沒有部署或GitHub發布。adapter技術細節見 [M4交接](docs/m4-handoff.md)。
+
+本機設定範例（仍停用付費；不包含 key）：
+
+```dotenv
+EQA_ENABLE_PAID_API=0
+EQA_PROVIDER=openai
+EQA_MODEL=gpt-5.6-luna
+EQA_COST_STAGE=development
+```
+
+付費入口另要求已批准並初始化的 `.local/cost-ledger.json`。兩階段上限一次寫入，不隨重啟重設、不互借；A/B/C 必須注入同一本帳。帳本記錄請求 ID、預留額及 usage，不存 prompt 或 key。每次先持久預留 US$0.5323728（整個模型 context 的長上下文 cache-write 上界＋最大輸出），再送出；有效 usage 依 input 全按 cache-write 費率計算保守上界，並非精確帳單金額。未知 usage／HTTP 失敗保留原預留額。JSON 校驗、獨占鎖與原子置換防止部分寫入／併發超額；崩潰留下鎖時停止並人工核對，不能直接清帳重跑。帳本及鎖需保留，不保證抵抗人為刪改或硬體儲存故障。
+
+僅允許標準 OpenAI endpoint、Luna、low reasoning、4096 最大輸出、零重試與 55 秒內 timeout；文字與 schema 序列化合計限 64 KB。費率包含 cache-write 的保守預留，沒有宣稱 tokenizer 精確估算。runner 的 `--paid` 僅使用 development 帳本與公開開發題，不允許挪用 research 額度。每輪使用新的 run-id；失敗／中斷不覆寫或自動續跑。原始 provider 回覆存私有 provider-traces，發布前必須審查。開發 runner 遇到任務逾時會停止；正式評估將任務／SQL資源逾時保留為失敗並繼續。兩者均保留可辨識的模型格式／SQL錯誤；傳輸、身分、帳本或基礎設施錯誤停止，尚未執行的題目明示保留。

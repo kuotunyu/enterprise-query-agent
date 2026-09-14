@@ -1,0 +1,65 @@
+{
+  "purpose": "Offline deterministic public-development engineering verification; no model performance score or held-out data",
+  "runs": [
+    {
+      "run_id": "step1-verified",
+      "dataset_id": "synthetic-v1",
+      "source_tree_sha256": "9743445ca54c59b1b12284f60e1c30b770a78e7260fdd55c2e6861dfd7946eee",
+      "manifest_sha256": "4d5835ad05757c769ad3c4f30990f84c75947904b7c42d55ec16b9dfcba3be92",
+      "events_sha256": "26a2402a094bb7743bc3e01a4f68001aff4920ef841f896041c209a6e6beb557",
+      "terminal_count": 78,
+      "status_counts": {
+        "A:answered": 19,
+        "A:empty": 2,
+        "A:unsupported": 5,
+        "B:answered": 20,
+        "B:empty": 2,
+        "B:unsupported": 4,
+        "C:answered": 20,
+        "C:empty": 2,
+        "C:unsupported": 4
+      },
+      "answered_case_table_parity": 20,
+      "actual_api_calls": 0,
+      "api_cost_usd": "0",
+      "quality_score": null
+    },
+    {
+      "run_id": "step1-real-001",
+      "dataset_id": "olist-local-969f3ae180928f54",
+      "source_tree_sha256": "9743445ca54c59b1b12284f60e1c30b770a78e7260fdd55c2e6861dfd7946eee",
+      "manifest_sha256": "ee2cfbb843c9a294f275bd445b27a8792250ea0247be6af04d0354fa701adb3a",
+      "events_sha256": "7879fcf577676bc913fc0249ab2c6fedefa9b98183816ee99f5009ed6c3b5fc7",
+      "terminal_count": 78,
+      "status_counts": {
+        "A:answered": 19,
+        "A:empty": 2,
+        "A:unsupported": 5,
+        "B:answered": 20,
+        "B:empty": 2,
+        "B:unsupported": 4,
+        "C:answered": 20,
+        "C:empty": 2,
+        "C:unsupported": 4
+      },
+      "answered_case_table_parity": 20,
+      "actual_api_calls": 0,
+      "api_cost_usd": "0",
+      "quality_score": null
+    }
+  ],
+  "checks": [
+    "manifest and append-only hash chain",
+    "current source tree matches run",
+    "78 unique starts and terminal outcomes per run",
+    "all shared task budgets respected",
+    "all evidence uses runtime dataset",
+    "matching tables among supported deterministic methods"
+  ],
+  "limitations": [
+    "26 public development questions reused across methods and datasets; not independent study samples",
+    "unsupported and empty outcomes retained; no outcome excluded from total",
+    "B mock finite independent SQL fixtures are not model-generated SQL",
+    "database cache state not controlled; no paid adapter calls"
+  ]
+}

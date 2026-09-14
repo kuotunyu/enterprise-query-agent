@@ -1,6 +1,6 @@
 # Project working agreement
 
-- Read README.md, the v1 design, acceptance cases and delivery plan first. The 2026-09-14 starting state contains planning documents only.
+- Start with PROJECT_PLAN.md, the single execution entry point. M1–M3 are complete. Read detailed design and acceptance documents only as needed; historical plans are not additional work queues.
 - Work only within this project's checkout. The upstream Olist project is a read-only source reference; keep its Git checkout, database, containers and volumes intact.
 - The owner approved the v1 direction. Follow the current session's stage and resource authorization; plans do not independently authorize paid evaluations, cloud deployment or publication.
 - Formal GitHub owner: kuotunyu. Preserve source attribution. Never initialize or publish the whole portfolio root.
