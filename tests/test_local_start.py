@@ -24,3 +24,25 @@ def test_web_port_collision_keeps_owner_running():
         assert r.returncode != 0
         assert 'EQA_WEB_PORT' in r.stderr
         with socket.create_connection(('127.0.0.1',port),timeout=1): pass
+
+
+def test_configure_alternate_port_preserves_existing_pair(tmp_path):
+    import pytest
+    from scripts.configure_local import configure
+    configure(tmp_path, port=3317)
+    before = {p.name: p.read_bytes() for p in tmp_path.iterdir()}
+    assert 'EQA_DB_PORT=3317' in (tmp_path/'runtime.env').read_text().splitlines()
+    assert 'EQA_DB_PORT=3317' in (tmp_path/'bootstrap.env').read_text().splitlines()
+    configure(tmp_path)
+    configure(tmp_path, port=3317)
+    with pytest.raises(RuntimeError, match='existing'):
+        configure(tmp_path, port=3318)
+    assert {p.name: p.read_bytes() for p in tmp_path.iterdir()} == before
+
+
+def test_configure_rejects_shared_mysql_port_before_writing(tmp_path):
+    import pytest
+    from scripts.configure_local import configure
+    with pytest.raises(ValueError, match='3306'):
+        configure(tmp_path, port=3306)
+    assert list(tmp_path.iterdir()) == []

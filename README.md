@@ -12,7 +12,9 @@
 
 ```powershell
 uv sync --frozen --python 3.12
-uv run python scripts/configure_local.py
+uv run python scripts/configure_local.py  # New pair: add --port 3317 here if 3307 is in use
+uv run python scripts/check_mysql_port.py  # First/stopped DB only; skip if this DB already runs
+# Continue only if the pre-start check succeeds.
 docker compose --env-file .local/bootstrap.env up -d --wait
 uv run --env-file .local/bootstrap.env python scripts/bootstrap_data.py
 uv run --env-file .local/runtime.env python scripts/serve.py
@@ -23,6 +25,20 @@ uv run --env-file .local/runtime.env python scripts/serve.py
 `configure_local.py` 建立隨機密碼，重跑保留既有設定。`.local/bootstrap.env` 供建庫／匯入；Web **只能使用 `.local/runtime.env`**。不要把 bootstrap 密碼放進 Web 環境。
 
 MySQL 使用專案 `eqa_v1`、專用 volume、loopback port **3307**；Web 使用 **8010**。埠占用時報錯，不停止其他服務。資料庫埠可在兩份本機 env 一致修改 `EQA_DB_PORT`；Web 可用 `--port 8011`。原 Olist checkout、資料庫、容器與 volumes 不受本案管理。
+
+### MySQL 啟動前檢查與替代埠
+
+本案與 MovieLens 都預設使用主機 **3307**；專用 volume 不代表連接埠不會衝突。第一次啟動或本案 MySQL 已停止時，先執行：
+
+```powershell
+uv run python scripts/check_mysql_port.py
+```
+
+檢查成功後才執行上面的 Compose 命令。工具只讀取兩份本機 env 並測試 socket，不連資料庫、不改設定、不停止服務。若本案 MySQL 已經在運作，跳過此檢查，原 Compose 重複啟動方式不變。可用性是當下快照，Compose 仍是最終檢查。
+
+若 3307 已由其他專案使用，新環境可改用 `uv run python scripts/configure_local.py --port 3317`（3317 也需先檢查，EQA 不允許使用 3306）。已有設定則只將 `.local/bootstrap.env` 與 `.local/runtime.env` 的 `EQA_DB_PORT` 一起改成同一個空閒埠，保留其餘內容與密碼；`--port` 不會改寫既有設定。Compose 的 `--env-file` 與 bootstrap/Web 的 `--env-file` 仍各用原本檔案。若使用另一組本機檔案，檢查時以兩次 `--env-file <檔案>` 指定同一組。
+
+Shell 的 `EQA_DB_PORT` 優先於 env 檔，檢查與啟動必須使用相同 shell 設定；建議清除過期覆寫再維護兩份檔案。使用 literal 整數埠，不在埠值內插入其他變數。更改埠只改主機映射，容器內仍是 3306；保留原 Compose project 與 volume，不為解決衝突刪除 volume 或停止其他專案。
 
 ## 使用
 

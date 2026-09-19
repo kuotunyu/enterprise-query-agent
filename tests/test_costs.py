@@ -96,6 +96,71 @@ def test_concurrent_reservations_cannot_overdraw(tmp_path):
     assert CostLedger(path,'development').total()==Decimal('0.5323728')
 
 
+def test_lock_access_denial_blocks_transport_without_mutation(tmp_path, monkeypatch):
+    import httpx
+    from pathlib import Path
+    from openai import OpenAI
+    from enterprise_query import costs
+    from enterprise_query.comparison import OpenAIMethod
+    from tests.test_service import req
+    path = tmp_path/'cost.json'
+    costs.CostLedger.initialize(path, {'development': '1', 'research': '1'})
+    ledger = costs.CostLedger(path, 'development')
+    before = path.read_bytes()
+    lock = path.with_suffix('.lock')
+    lock.write_bytes(b'another owner')
+    denied = PermissionError(13, 'Access denied', str(lock))
+    original_open = costs.os.open
+
+    def deny_lock(target, flags, *args, **kwargs):
+        if Path(target) == lock:
+            raise denied
+        return original_open(target, flags, *args, **kwargs)
+
+    def transport(request):
+        pytest.fail('request sent without acquiring the budget lock')
+
+    client = OpenAI(api_key='offline', http_client=httpx.Client(transport=httpx.MockTransport(transport)))
+    provider = OpenAIMethod('C', client, ledger)
+    monkeypatch.setattr(costs.os, 'open', deny_lock)
+    with pytest.raises(costs.BudgetError, match='lock unavailable') as failure:
+        provider.decide(req('GMV'), {})
+    assert failure.value.__cause__ is denied
+    assert path.read_bytes() == before
+    assert lock.read_bytes() == b'another owner'
+    assert not path.with_suffix('.pending').exists()
+    assert 'ledger_ticket' not in provider.last_usage
+
+
+def test_settlement_lock_access_denial_preserves_sent_reservation(tmp_path, monkeypatch):
+    from pathlib import Path
+    from enterprise_query import costs
+    path = tmp_path/'cost.json'
+    costs.CostLedger.initialize(path, {'development': '1', 'research': '1'})
+    ledger = costs.CostLedger(path, 'development')
+    ticket = ledger.reserve('already-sent-request')
+    before = path.read_bytes()
+    lock = path.with_suffix('.lock')
+    lock.write_bytes(b'another owner')
+    denied = PermissionError(13, 'Access denied', str(lock))
+    original_open = costs.os.open
+
+    def deny_lock(target, flags, *args, **kwargs):
+        if Path(target) == lock:
+            raise denied
+        return original_open(target, flags, *args, **kwargs)
+
+    monkeypatch.setattr(costs.os, 'open', deny_lock)
+    with pytest.raises(costs.BudgetError, match='lock unavailable') as failure:
+        ledger.settle(ticket, {'input_tokens': 100, 'output_tokens': 10})
+    assert failure.value.__cause__ is denied
+    assert 'no request sent' not in str(failure.value)
+    assert path.read_bytes() == before
+    assert lock.read_bytes() == b'another owner'
+    assert not path.with_suffix('.pending').exists()
+    assert json.loads(path.read_text())['data']['calls'][ticket]['state'] == 'reserved'
+
+
 @pytest.mark.parametrize('operation', ['construct', 'total', 'records'])
 def test_open_reader_excludes_reservation_until_handle_closes(tmp_path, monkeypatch, operation):
     from concurrent.futures import ThreadPoolExecutor

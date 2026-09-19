@@ -76,6 +76,9 @@ class CostLedger:
             descriptor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError as exc:
             raise BudgetError('Budget ledger locked; no request sent') from exc
+        except PermissionError as exc:
+            # Access denial can also mean a pending Windows deletion; never assume contention.
+            raise BudgetError('Budget ledger lock unavailable') from exc
         try:
             os.close(descriptor)
             yield
