@@ -73,6 +73,33 @@ def test_run_paths_exclusive_and_interrupted_log_recoverable(tmp_path):
     assert json.loads((first.path / 'manifest.json').read_text())['diagnostic']
 
 
+@pytest.mark.parametrize('partial_character', [b'\xe4', b'\xe4\xb8'])
+def test_partial_utf8_tail_recovers_summary_without_changing_raw(tmp_path, partial_character):
+    complete = json.dumps({'kind': 'offered', 'id': '中文字'}, ensure_ascii=False).encode('utf-8')
+    raw = complete + b'\n{"kind":"terminal","message":"' + partial_character
+    logfile = tmp_path / 'events.jsonl'
+    logfile.write_bytes(raw)
+    rows, truncated = m.read_rows(tmp_path)
+    assert rows == [{'kind': 'offered', 'id': '中文字'}]
+    assert truncated == 1
+    result = m.summary(tmp_path)
+    assert (result['offered'], result['terminal'], result['truncated_tail']) == (1, 0, 1)
+    assert result['status'] == 'interrupted_or_running'
+    assert logfile.read_bytes() == raw
+
+
+@pytest.mark.parametrize('corrupt_record', [b'{"kind":"\xff"}', b'{invalid-json}'])
+def test_interior_utf8_or_json_corruption_is_rejected(tmp_path, corrupt_record):
+    valid = b'{"kind":"offered","id":"one"}'
+    raw = valid + b'\n' + corrupt_record + b'\n' + valid + b'\n'
+    logfile = tmp_path / 'events.jsonl'
+    logfile.write_bytes(raw)
+    with pytest.raises(ValueError):
+        m.summary(tmp_path)
+    assert logfile.read_bytes() == raw
+    assert not list(tmp_path.glob('summary-*.json'))
+
+
 def test_scheduler_does_not_wait_for_response_and_marks_busy_reuse():
     async def exercise():
         rows, release, started = [], asyncio.Event(), asyncio.Event()

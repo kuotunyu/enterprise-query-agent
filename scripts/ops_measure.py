@@ -127,11 +127,15 @@ def read_rows(path):
     rows, truncated = [], 0
     logfile = Path(path) / 'events.jsonl'
     if logfile.exists():
-        lines = logfile.read_text(encoding='utf-8').splitlines()
+        # A killed append can cut a multibyte character. Decode each record
+        # strictly so only the tail can be discarded, never interior corruption.
+        lines = logfile.read_bytes().split(b'\n')
+        if lines[-1] == b'':
+            lines.pop()
         for index, line in enumerate(lines):
             try:
-                rows.append(json.loads(line))
-            except json.JSONDecodeError:
+                rows.append(json.loads(line.decode('utf-8')))
+            except (UnicodeDecodeError, json.JSONDecodeError):
                 if index != len(lines) - 1:
                     raise ValueError('Corrupt non-tail JSONL record')
                 truncated += 1
