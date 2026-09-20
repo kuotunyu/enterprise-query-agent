@@ -21,7 +21,7 @@ class Task:
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 class Service:
-    def __init__(self, executor_factory=None, provider=None):
+    def __init__(self, executor_factory=None, provider=None, *, observer=None, processing_timeout=60):
         if executor_factory is None:
             from .executor import Executor
             executor_factory=Executor
@@ -33,6 +33,36 @@ class Service:
         self.guard=asyncio.Lock()
         self.provider_lock=asyncio.Lock()
         self.provider_jobs=set()
+        self.observer=observer
+        self.processing_timeout=processing_timeout
+        self.workers={}
+
+    def observe(self, request_id, phase, seconds):
+        if self.observer is not None: self.observer(request_id,phase,seconds)
+
+    async def run_worker(self, request_id, phase, function, *args, **kwargs):
+        # Opt-in tracking keeps a cancelled await from hiding a live thread.
+        if self.observer is None:
+            return await asyncio.to_thread(function,*args,**kwargs)
+        async def work():
+            started=time.perf_counter()
+            try:
+                return await asyncio.to_thread(function,*args,**kwargs)
+            finally:
+                self.observe(request_id,phase,time.perf_counter()-started)
+        job=asyncio.create_task(work())
+        jobs=self.workers.setdefault(request_id,set())
+        jobs.add(job)
+        def completed(future):
+            jobs.discard(future)
+            if not future.cancelled(): future.exception()
+        job.add_done_callback(completed)
+        return await asyncio.shield(job)
+
+    async def wait_workers(self, request_id):
+        while jobs:=self.workers.get(request_id):
+            await asyncio.gather(*(asyncio.shield(job) for job in tuple(jobs)),return_exceptions=True)
+        self.workers.pop(request_id,None)
 
     def cancel(self,session_id):
         task=self.tasks.get(session_id)
@@ -54,7 +84,9 @@ class Service:
                 if request.revision <= task.revision:
                     return AnswerEnvelope(status='rejected',message='此修訂已過期。',request_id=key,session_id=request.session_id,revision=request.revision)
                 if request.revision > task.revision:
-                    if task.executor is not None: task.executor.cancel()
+                    if task.executor is not None:
+                        if self.observer is None: task.executor.cancel()
+                        else: await self.run_worker(key,'cancel_seconds',task.executor.cancel)
                     task.revision=request.revision
                 future=asyncio.create_task(self._run(request,task))
                 self.requests[key]=future
@@ -63,7 +95,9 @@ class Service:
         return self._stamp(answer.model_copy(deep=True),request,self.tasks[request.session_id])
 
     async def _run(self,r,t):
+        queued=time.perf_counter()
         async with t.lock:
+            self.observe(r.request_id,'queue_seconds',time.perf_counter()-queued)
             started=time.monotonic()
             def envelope(status,message,**kwargs):
                 return AnswerEnvelope(status=status,message=message,**kwargs)
@@ -72,11 +106,15 @@ class Service:
                 if r.revision!=t.revision: return self._stamp(envelope('rejected','此修訂已過期。'),r,t)
                 if t.cancelled: return self._stamp(envelope('rejected','任務已取消；請建立新任務。'),r,t)
                 if t.calls>=3: return self._stamp(envelope('rejected','已達每任務 3 次規劃呼叫上限；請建立新任務。'),r,t)
-                remaining=60-t.active
+                remaining=self.processing_timeout-t.active
                 if remaining<=0: return self._stamp(envelope('timeout','任務已達 60 秒實際處理上限。'),r,t)
                 async with asyncio.timeout(remaining):
                     # Waiting for a provider slot is cancellable; no thread is queued yet.
-                    await self.provider_lock.acquire()
+                    queued=time.perf_counter()
+                    try:
+                        await self.provider_lock.acquire()
+                    finally:
+                        self.observe(r.request_id,'queue_seconds',time.perf_counter()-queued)
                     if t.cancelled or r.revision!=t.revision:
                         self.provider_lock.release()
                         return self._stamp(envelope('rejected','任務已取消或修訂已更新。'),r,t)
@@ -114,13 +152,13 @@ class Service:
                             if t.sql+len(queries)>3: answer=envelope('rejected','已達每任務 3 條業務 SELECT 上限；请建立新任務。')
                             else:
                                 t.executor=self.executor_factory()
-                                await asyncio.to_thread(t.executor.check_identity)
+                                await self.run_worker(r.request_id,'sql_seconds',t.executor.check_identity)
                                 results=[]
                                 for query in queries:
                                     if t.cancelled or r.revision!=t.revision: break
                                     t.sql+=1
                                     try:
-                                        result=await asyncio.to_thread(t.executor.execute,query.sql,parameters=query.parameters,timeout_ms=min(5000,max(1,int((60-t.active-(time.monotonic()-started))*1000))))
+                                        result=await self.run_worker(r.request_id,'sql_seconds',t.executor.execute,query.sql,parameters=query.parameters,timeout_ms=min(5000,max(1,int((self.processing_timeout-t.active-(time.monotonic()-started))*1000))))
                                     except Exception as exc:
                                         import pymysql
                                         if getattr(self.provider,'method',None)=='B' and isinstance(exc,pymysql.MySQLError) and exc.args and exc.args[0] in {1052,1054,1055,1060,1064,1111,1140,1241,1242,1264,1292,1366,1582,1690}:
@@ -135,7 +173,9 @@ class Service:
                                     answer=build_answer(plan,results)
             except (TimeoutError, asyncio.TimeoutError):
                 if t.attempts and t.attempts[-1]['status']=='started': t.attempts[-1].update(status='timeout',error_type='TimeoutError')
-                if t.executor is not None: t.executor.cancel()
+                if t.executor is not None:
+                    if self.observer is None: t.executor.cancel()
+                    else: await self.run_worker(r.request_id,'cancel_seconds',t.executor.cancel)
                 answer=envelope('timeout','查詢或任務超時，已要求資料庫停止執行。')
             except Exception as exc:
                 # Do not leak connection strings, filesystem paths or provider traces.
@@ -165,7 +205,7 @@ class Service:
             except Exception as exc:
                 return None,copy.deepcopy(getattr(self.provider,'last_usage',{})),type(exc).__name__
         try:
-            decision,usage,error_type=await asyncio.to_thread(plan_once)
+            decision,usage,error_type=await self.run_worker(r.request_id,'provider_seconds',plan_once)
             attempt['provider_usage']=usage
             if decision is not None and getattr(self.provider,'record_decision',False):
                 attempt['decision']=decision.model_dump(mode='json')
