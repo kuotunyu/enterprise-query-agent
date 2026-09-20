@@ -74,7 +74,9 @@ class Service:
     async def ask(self,request):
         key=request.request_id
         fingerprint=request.model_dump_json()
+        queued=time.perf_counter()
         async with self.guard:
+            self.observe(key,'queue_seconds',time.perf_counter()-queued)
             if key in self.requests:
                 if self.fingerprints[key]!=fingerprint:
                     return AnswerEnvelope(status='rejected',message='request_id 已用於另一個請求。',request_id=key,session_id=request.session_id,revision=request.revision)

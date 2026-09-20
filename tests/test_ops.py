@@ -314,3 +314,109 @@ def test_failed_cancel_keeps_slot_until_sql_finishes_then_releases_it():
         await until(lambda: ops.active == 0)
         assert 'secret' not in str(ops.metrics())
     asyncio.run(run())
+
+
+def test_real_executor_deadline_connection_keeps_slot_and_shutdown_pending(monkeypatch):
+    """Only network connections are fake; execute/cancel/Timer lifecycle is real."""
+    from enterprise_query.executor import Executor
+    timer_entered, timer_release = threading.Event(), threading.Event()
+    timer_finished, sql_closed = threading.Event(), threading.Event()
+
+    class Connection:
+        def __init__(self, is_timer):
+            self.is_timer, self.business, self.command = is_timer, False, ''
+            self.description = []
+        def __enter__(self): return self
+        def __exit__(self, *args): self.close()
+        def cursor(self): return self
+        def thread_id(self): return 7
+        def close(self):
+            if self.business: sql_closed.set()
+            if self.is_timer: timer_finished.set()
+        def execute(self, sql, parameters=()):
+            self.command = sql
+            if sql.startswith('SELECT * FROM ('):
+                self.business = True
+                assert timer_entered.wait(2)
+        def fetchone(self):
+            return {'db': 'eqa_v1', 'user': 'eqa_reader@localhost', 'version': '8.4.0'}
+        def fetchall(self):
+            if self.command == 'SHOW GRANTS':
+                return [{'grant': 'GRANT USAGE ON *.* TO `eqa_reader`@`localhost`'}]
+            if self.command == 'SELECT key_name,value_text FROM eqa_metadata':
+                return [{'key_name': key, 'value_text': value} for key, value in
+                        {'project_id': 'eqa_v1', 'dataset_id': 'synthetic-v1',
+                         'schema_version': 'schema-v1', 'etl_version': 'etl-v1'}.items()]
+            return []
+
+    def connect(self, read_timeout=6):
+        is_timer = isinstance(threading.current_thread(), threading.Timer)
+        if is_timer:
+            timer_entered.set()
+            assert timer_release.wait(3)
+        return Connection(is_timer)
+
+    monkeypatch.setattr(Executor, 'connect', connect)
+
+    async def run():
+        from enterprise_query.ops import OpsRuntime
+        clock = [0.0]
+        ops = OpsRuntime(executor_factory=Executor, provider=MockPlanner(),
+                         processing_timeout=.2, retention_seconds=1, clock=lambda: clock[0])
+        session = ops.create_session()
+        work = asyncio.create_task(ops.ask(ops.epoch, question(session)))
+        closing = None
+        try:
+            response = await work
+            await until(sql_closed.is_set)
+            assert response['answer']['status'] == 'timeout'
+            assert timer_entered.is_set() and not timer_finished.is_set()
+            assert ops.active == 1
+            assert ops.drain()['outstanding_jobs'] == 1
+            clock[0] += 10
+            ops.cleanup()
+            assert session['session_id'] in ops.sessions
+            closing = asyncio.create_task(ops.close())
+            await asyncio.sleep(.02)
+            assert not closing.done()
+        finally:
+            timer_release.set()
+            await work
+            await ops.close()
+            if closing is not None: await closing
+        assert timer_finished.is_set() and ops.active == 0
+    asyncio.run(run())
+
+
+def test_other_session_guard_wait_is_included_in_queue_timing():
+    async def run():
+        from enterprise_query.ops import OpsRuntime
+        sql_entered, sql_release = threading.Event(), threading.Event()
+        cancel_entered, cancel_release = threading.Event(), threading.Event()
+        class SQL(FakeExecutor):
+            def execute(self, *args, **kwargs):
+                sql_entered.set()
+                assert sql_release.wait(2)
+                return super().execute(*args, **kwargs)
+            def cancel(self):
+                cancel_entered.set()
+                assert cancel_release.wait(2)
+        ops = OpsRuntime(executor_factory=SQL, provider=MockPlanner())
+        first, second = ops.create_session(), ops.create_session()
+        original = asyncio.create_task(ops.ask(ops.epoch, question(first)))
+        await until(sql_entered.is_set)
+        revised = asyncio.create_task(ops.ask(ops.epoch, question(first, 'revision', 2)))
+        await until(cancel_entered.is_set)
+        independent = asyncio.create_task(ops.ask(ops.epoch, question(second, 'other')))
+        try:
+            await until(lambda: ops.active == 3)
+            await asyncio.sleep(.08)
+        finally:
+            cancel_release.set()
+            sql_release.set()
+            await asyncio.gather(original, revised, independent)
+        await until(lambda: ops.active == 0)
+        result = await ops.ask(ops.epoch, question(second, 'other'))
+        assert result['answer']['status'] == 'answered'
+        assert result['timings']['queue_seconds'] >= .06
+    asyncio.run(run())

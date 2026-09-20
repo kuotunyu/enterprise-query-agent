@@ -146,8 +146,16 @@ class Executor:
             raise
         finally:
             timer.cancel()
-            with self._lock:
-                self._active.pop(cid,None)
-                self._pending.pop(canceled,None)
-            if conn is not None:
-                conn.close()
+            try:
+                with self._lock:
+                    self._active.pop(cid,None)
+                    self._pending.pop(canceled,None)
+                if conn is not None:
+                    conn.close()
+            finally:
+                # cancel() only prevents a future callback; an already-running
+                # deadline may still hold a separate cancellation connection.
+                # Join outside _lock, which that callback also needs. Completion
+                # of execute includes its child work, even if close raises.
+                if timer.ident is not None:
+                    timer.join()

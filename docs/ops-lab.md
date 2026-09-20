@@ -92,7 +92,11 @@ supervisor or release capacity. A business timeout may return while its provider
 DB identity check or SQL worker still runs. `work_pending=true` explicitly marks
 that distinction. Cancellation cannot forcibly kill a Python provider thread.
 The supervisor releases the slot only after the real workers and any cancellation
-operation finish. Graceful application shutdown drains and waits for this work;
+operation finish. The executor also waits for its own already-running SQL
+deadline callback before its worker completes; cancelling a timer alone does not
+stop a callback that has already opened a cancellation connection. This wait runs
+outside the executor lock, so callback cleanup cannot deadlock on that lock.
+Graceful application shutdown drains and waits for this work;
 forced process termination still has the restart/unknown-outcome boundary above.
 
 Readiness has a **1-second response deadline**, checks the live DB identity, and
@@ -105,7 +109,8 @@ restore readiness.
 ### Timing and measurement boundary
 
 The clock is monotonic (`perf_counter` for precise elapsed measurement). `/ops/ask`
-reports seconds for `queue_seconds` (session and serialized-provider waits),
+reports seconds for `queue_seconds` (global admission guard, session and
+serialized-provider waits),
 `provider_seconds`, `sql_seconds` (identity checks plus business SQL), and
 `total_seconds` (admission to actual completion). These are wall durations,
 including thread scheduling overhead, not GPU or MySQL server-only timings.
