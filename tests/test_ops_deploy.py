@@ -130,3 +130,27 @@ def test_drain_timeout_never_reports_lingering_job_as_stopped(monkeypatch):
     monkeypatch.setattr(deployment.time, 'sleep', lambda _: None)
     with pytest.raises(RuntimeError, match='no forced stop'):
         deployment.drain({}, timeout=1)
+
+
+def test_context_materialization_rejects_source_changed_after_snapshot(tmp_path):
+    deployment = module()
+    source = tmp_path / 'source'
+    source.mkdir()
+    (source / 'uv.lock').write_text('accepted')
+    hashes = {'uv.lock': deployment.digest(source / 'uv.lock')}
+    (source / 'uv.lock').write_text('changed')
+    with pytest.raises(ValueError, match='changed'):
+        deployment.materialize_context(source, tmp_path / 'context', hashes)
+
+
+def test_context_materialization_copies_only_snapshot_files(tmp_path):
+    deployment = module()
+    source = tmp_path / 'source'
+    source.mkdir()
+    (source / 'uv.lock').write_text('accepted')
+    (source / 'secret.env').write_text('never-copy')
+    hashes = {'uv.lock': deployment.digest(source / 'uv.lock')}
+    target = tmp_path / 'context'
+    deployment.materialize_context(source, target, hashes)
+    assert sorted(p.name for p in target.iterdir()) == ['uv.lock']
+    assert deployment.digest(target / 'uv.lock') == hashes['uv.lock']

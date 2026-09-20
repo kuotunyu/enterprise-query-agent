@@ -194,12 +194,12 @@ with a new epoch; no requests are replayed and cost locks are never reset.
 
 ### Rebuild and provenance boundary
 
-The build context is a tar assembled from Git-tracked allowlisted source,
+The build context is a separate directory assembled from Git-tracked allowlisted source,
 tests, schema/catalog and public synthetic fixture files. It excludes ignored
 files, local state, old ledgers, real data and research reports. Dockerfile
 COPY and `.dockerignore` provide another boundary; use the CLI rather than
 an unrestricted manual context. Receipts include Git SHA and honest dirty
-state, each context file's hash, context/lock hashes, exact image IDs and
+state, each context file's hash, context-manifest/lock hashes, exact image IDs and
 resolved repository digests. Builds resolve the Python 3.12 and uv 0.11.18
 image tags once and pass immutable digests to Docker; deployment uses the
 resulting app/MySQL image IDs with pull disabled. The existing local

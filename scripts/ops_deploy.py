@@ -15,7 +15,6 @@ import secrets
 import shutil
 import socket
 import subprocess
-import tarfile
 import time
 from uuid import uuid4
 from urllib.error import HTTPError, URLError
@@ -87,6 +86,19 @@ def validate_image(receipt):
     return receipt['image_id']
 
 
+def materialize_context(source, target, hashes):
+    target.mkdir(parents=True, exist_ok=False)
+    for path, expected in hashes.items():
+        full = source / path
+        if full.is_symlink() or not full.resolve().is_relative_to(source.resolve()):
+            raise ValueError('Build context contains a linked path')
+        destination = target / path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(full, destination)
+        if digest(destination) != expected:
+            raise ValueError('Source changed after build snapshot')
+
+
 def command(args, *, env=None, timeout=300, redact=(), stdin=None, combined=False):
     process = subprocess.run(args, cwd=ROOT, env=env, input=stdin, capture_output=True,
                              timeout=timeout)
@@ -132,7 +144,9 @@ def build(target):
             raise ValueError('Commit or stage deployment sources before building')
         hashes = {p: digest(ROOT / p) for p in paths}
         result.update(source_sha=sha, source_dirty=dirty, files=hashes,
-                      lock_sha256=digest(ROOT / 'uv.lock'), target=target)
+                      lock_sha256=digest(ROOT / 'uv.lock'), target=target,
+                      deployment_files={p: digest(ROOT / p) for p in
+                          ('compose.ops.yaml', 'db/bootstrap/00_identity.sql')})
         pinned = {}
         for key, ref in [('python', 'python:3.12-slim-bookworm'), ('uv', 'ghcr.io/astral-sh/uv:0.11.18')]:
             command(['docker', 'pull', ref], timeout=600)
@@ -142,21 +156,16 @@ def build(target):
             pinned[key] = identity
         mysql = inspect_image('mysql:8.4')
         result.update(base_images=pinned, mysql_image=mysql)
-        context = OPS / 'builds' / ('context-' + uuid4().hex + '.tar')
-        with tarfile.open(context, 'x') as archive:
-            for path in paths:
-                full = ROOT / path
-                if full.is_symlink() or not full.resolve().is_relative_to(ROOT.resolve()):
-                    raise ValueError('Build context contains a linked path')
-                archive.add(full, arcname=path, recursive=False)
-        result['context_sha256'] = digest(context)
+        context = OPS / 'builds' / ('context-' + uuid4().hex)
+        materialize_context(ROOT, context, hashes)
+        result['context_manifest_sha256'] = hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()
         tag = 'eqaops-local:' + sha[:12] + '-' + target + '-' + uuid4().hex[:8]
         output = command(['docker', 'build', '--target', target, '-f', 'Dockerfile.ops',
                           '--build-arg', 'PYTHON_IMAGE=' + pinned['python']['repo_digests'][0],
                           '--build-arg', 'UV_IMAGE=' + pinned['uv']['repo_digests'][0],
                           '--build-arg', 'SOURCE_SHA=' + sha,
-                          '--build-arg', 'SOURCE_DIRTY=' + str(dirty).lower(), '-t', tag, '-'],
-                         timeout=900, stdin=context.read_bytes(), combined=True)
+                          '--build-arg', 'SOURCE_DIRTY=' + str(dirty).lower(), '-t', tag, str(context)],
+                         timeout=900, combined=True)
         image = inspect_image(tag)
         result.update(kind='eqaops-image', image_id=image['id'], image=image,
                       tag=tag, build_output=output)
@@ -266,6 +275,9 @@ def deploy(name, port, image_receipt):
     image_id = validate_image(image)
     if image.get('status') != 'passed':
         raise ValueError('Image build did not pass')
+    for file, expected in image['deployment_files'].items():
+        if digest(ROOT / file) != expected:
+            raise ValueError('Deployment files changed since image build')
     for kind in ('container', 'network', 'volume'):
         existing = command(['docker', kind, 'ls', '-aq' if kind == 'container' else '-q', '--filter', 'label=com.docker.compose.project=' + name])
         if existing:
@@ -297,6 +309,8 @@ def deploy(name, port, image_receipt):
         result['bootstrap'] = compose(path, config, ['run', '--rm', '--no-deps', 'bootstrap'])
         result['fixture'] = json.loads((path / 'init/dataset-manifest.json').read_text())
         result['oracle'] = json.loads(compose(path, config, ['run', '--rm', '--no-deps', 'integration']))
+        if result['oracle']['installed_lock_sha256'] != config['lock_sha256']:
+            raise ValueError('Installed dependency lock differs from build receipt')
         result['app_start'] = compose(path, config, ['up', '-d', '--no-deps', 'app'])
         result['readiness'] = wait_ready(config)
         result['meta'] = http(config, '/ops/meta')[1]
