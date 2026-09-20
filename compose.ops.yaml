@@ -54,9 +54,10 @@ services:
     ports: ["127.0.0.1:${EQA_OPS_HTTP_PORT:?HTTP port required}:8011"]
     volumes: ["${EQA_OPS_STACK_DIR}/state:/app/.local"]
     stop_grace_period: 75s
-    networks: [private]
+    networks: [private, ingress]
 networks:
   private:
     internal: true
+  ingress: {}
 volumes:
   mysql_data:

@@ -210,6 +210,8 @@ def check_container(info, name, port):
     if service == 'app':
         if bindings != {'8011/tcp': [{'HostIp': '127.0.0.1', 'HostPort': str(port)}]}:
             raise ValueError('App must publish exactly the loopback HTTP port')
+        if info.get('State', {}).get('Status') == 'running' and info.get('NetworkSettings', {}).get('Ports') != bindings:
+            raise ValueError('App loopback HTTP port is not actually published')
     elif bindings:
         raise ValueError('Database/tool must never publish a host port')
     for mount in info.get('Mounts', []):
@@ -225,6 +227,7 @@ def resources(path, config):
         check_container(info, config['stack'], config['http_port'])
         output.append({'id': cid, 'name': info['Name'], 'image': info['Image'],
                        'state': info['State']['Status'], 'ports': info['HostConfig'].get('PortBindings'),
+                       'actual_ports': info['NetworkSettings'].get('Ports'),
                        'mounts': [{'type': m['Type'], 'name': m.get('Name'), 'destination': m['Destination']}
                                   for m in info.get('Mounts', [])]})
     return output
@@ -282,7 +285,7 @@ def deploy(name, port, image_receipt):
         existing = command(['docker', kind, 'ls', '-aq' if kind == 'container' else '-q', '--filter', 'label=com.docker.compose.project=' + name])
         if existing:
             raise ValueError('Project resources already exist; refusing adoption')
-    for resource in (name + '_mysql_data', name + '_private'):
+    for resource in (name + '_mysql_data', name + '_private', name + '_ingress'):
         listing = command(['docker', 'volume' if resource.endswith('_data') else 'network', 'ls', '--format', '{{.Name}}'])
         if resource in listing.splitlines():
             raise ValueError('Resource name already exists')
@@ -312,6 +315,7 @@ def deploy(name, port, image_receipt):
         if result['oracle']['installed_lock_sha256'] != config['lock_sha256']:
             raise ValueError('Installed dependency lock differs from build receipt')
         result['app_start'] = compose(path, config, ['up', '-d', '--no-deps', 'app'])
+        result['resources'] = resources(path, config)
         result['readiness'] = wait_ready(config)
         result['meta'] = http(config, '/ops/meta')[1]
         result['resources'] = resources(path, config)

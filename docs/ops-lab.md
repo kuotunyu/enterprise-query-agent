@@ -232,3 +232,5 @@ Rollback is the same bounded process targeting the prior receipt's exact ID.
 unchanged Compose snapshot, removes only its containers/network, and retains
 the database volume and all evidence. Neither command invokes global prune,
 deletes volumes/images, or touches unrelated Docker projects.
+
+The database stays on an internal private network. The app also joins its own ingress bridge so Docker Desktop can realize its host-loopback HTTP publication; no other service joins ingress. Receipts check actual running port bindings, not only requested configuration. The first internal-only deployment failed host readiness despite passing its database oracle; that failed receipt and volume remain preserved.

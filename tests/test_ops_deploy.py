@@ -154,3 +154,16 @@ def test_context_materialization_copies_only_snapshot_files(tmp_path):
     deployment.materialize_context(source, target, hashes)
     assert sorted(p.name for p in target.iterdir()) == ['uv.lock']
     assert deployment.digest(target / 'uv.lock') == hashes['uv.lock']
+
+
+def test_running_app_requires_actual_published_loopback_port():
+    deployment = module()
+    expected = {'8011/tcp': [{'HostIp': '127.0.0.1', 'HostPort': '18011'}]}
+    app = {'Config': {'Labels': {'com.docker.compose.project': 'eqaops-test',
+                                'com.docker.compose.service': 'app'}},
+           'HostConfig': {'PortBindings': expected}, 'Mounts': [],
+           'State': {'Status': 'running'}, 'NetworkSettings': {'Ports': {'8011/tcp': []}}}
+    with pytest.raises(ValueError, match='actually published'):
+        deployment.check_container(app, 'eqaops-test', 18011)
+    app['NetworkSettings']['Ports'] = expected
+    deployment.check_container(app, 'eqaops-test', 18011)
