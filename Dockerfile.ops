@@ -1,0 +1,23 @@
+ARG PYTHON_IMAGE
+ARG UV_IMAGE
+FROM ${UV_IMAGE} AS uv
+FROM ${PYTHON_IMAGE} AS runtime
+COPY --from=uv /uv /usr/local/bin/uv
+WORKDIR /app
+ENV PATH="/app/.venv/bin:$PATH" PYTHONPATH=/app/src:/app PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 UV_COMPILE_BYTECODE=0
+COPY pyproject.toml uv.lock README.md LICENSE ./
+COPY src ./src
+COPY scripts ./scripts
+COPY tests ./tests
+COPY catalog ./catalog
+COPY db ./db
+COPY data/synthetic ./data/synthetic
+RUN uv sync --locked --no-install-project && sha256sum uv.lock > /app/installed-lock.sha256
+ARG SOURCE_SHA
+ARG SOURCE_DIRTY
+LABEL org.opencontainers.image.revision=${SOURCE_SHA} eqaops.source-dirty=${SOURCE_DIRTY} eqaops.kind="eqaops-image"
+CMD ["uvicorn", "enterprise_query.ops:create_ops_app", "--factory", "--host", "0.0.0.0", "--port", "8011", "--workers", "1"]
+
+FROM runtime AS unready
+# Deliberate invalid DB endpoint: live stays up, live-dependency readiness fails.
+CMD ["sh", "-c", "EQA_DB_PORT=1 exec uvicorn enterprise_query.ops:create_ops_app --factory --host 0.0.0.0 --port 8011 --workers 1"]

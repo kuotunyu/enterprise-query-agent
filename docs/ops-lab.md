@@ -147,3 +147,88 @@ work with deterministic, event-controlled workers. They cover coalescing,
 capacity, retention, epoch validation, late completion, disconnect/cancel/drain,
 live readiness during a slow cancellation and timing on failures. They do not
 claim a running MySQL/container experiment or any paid-provider measurements.
+
+## Isolated container deployment
+
+`scripts/ops_deploy.py` owns only uniquely named `eqaops-*` Compose projects.
+It never uses the original `compose.yaml`. Each deployment creates a fresh
+MySQL 8.4 volume, credentials and ignored `.local/ops/<stack>/` directory;
+existing resources or directories with the requested name are rejected.
+MySQL listens privately on 3307 without any published host port. Bootstrap and
+integration one-shot containers share MySQL's network namespace, preserving
+the existing initializer's loopback-only/non-3306 guard. The app uses
+`mysql:3307`; only its HTTP port is published, on host `127.0.0.1`.
+Both image variants run uvicorn as PID 1, with one worker. The container's
+`0.0.0.0:8011` listener is behind that loopback-only host mapping.
+
+Commit the reviewed deployment source before building, then use the paths
+printed by each command (replace the example names/receipt paths):
+
+```console
+uv run --locked python scripts/ops_deploy.py build
+uv run --locked python scripts/ops_deploy.py deploy eqaops-run-a --port 18011 --image-receipt .local/ops/builds/<runtime-receipt>.json
+uv run --locked python scripts/ops_deploy.py verify eqaops-run-a
+uv run --locked python scripts/ops_deploy.py status eqaops-run-a
+uv run --locked python scripts/ops_deploy.py deploy eqaops-run-b --port 18012 --image-receipt .local/ops/builds/<same-runtime-receipt>.json
+uv run --locked python scripts/ops_deploy.py verify eqaops-run-b
+```
+
+`deploy` starts a healthy MySQL, invokes the unchanged synthetic initializer,
+checks the committed `base.json` against its generator and the independent
+Python/real MySQL hand oracle, then starts the app and checks live readiness.
+`verify` additionally runs the existing integration-marked tests in a one-shot
+container with reader credentials. `EQA_MUTATION` stays unset: destructive
+3308-only tests are skipped. The old `/api/*` HTTP flow and browser suite need
+the independent original application; they are outside this stack and are not
+counted as operations endpoint coverage. This is synthetic development
+verification, never a locked research evaluation.
+
+Every command writes a fresh, exclusive receipt, including failed attempts.
+Credentials are generated exclusively in three separate env files, are never
+printed, and are not image build inputs. These local files are sensitive and
+must not be published. Unix mode 0600 is requested; on Windows their access
+inherits workspace ACLs, so this remains a single trusted operator setup.
+The app receives only reader credentials. Its isolated `state` mount survives
+image replacement, but sessions/dedup are deliberately volatile and restart
+with a new epoch; no requests are replayed and cost locks are never reset.
+
+### Rebuild and provenance boundary
+
+The build context is a tar assembled from Git-tracked allowlisted source,
+tests, schema/catalog and public synthetic fixture files. It excludes ignored
+files, local state, old ledgers, real data and research reports. Dockerfile
+COPY and `.dockerignore` provide another boundary; use the CLI rather than
+an unrestricted manual context. Receipts include Git SHA and honest dirty
+state, each context file's hash, context/lock hashes, exact image IDs and
+resolved repository digests. Builds resolve the Python 3.12 and uv 0.11.18
+image tags once and pass immutable digests to Docker; deployment uses the
+resulting app/MySQL image IDs with pull disabled. The existing local
+`mysql:8.4` image is recorded, not silently upgraded. `uv sync --locked
+--no-install-project` installs the committed dependency lock; source is loaded
+through explicit `PYTHONPATH`, avoiding an unpinned isolated build backend.
+The installed lock hash and actual runtime DB identity are checked by the
+container oracle. These records do not promise bit-identical image rebuilding
+across platforms or availability of deleted image caches. Keep exact images
+and their receipts for rollback; no registry publication occurs.
+
+### Drain, replacement and explicit rollback
+
+```console
+uv run --locked python scripts/ops_deploy.py build --target unready
+uv run --locked python scripts/ops_deploy.py update eqaops-run-a --image-receipt .local/ops/builds/<unready-receipt>.json
+uv run --locked python scripts/ops_deploy.py rollback eqaops-run-a --image-receipt .local/ops/builds/<previous-runtime-receipt>.json
+uv run --locked python scripts/ops_deploy.py stop eqaops-run-a
+uv run --locked python scripts/ops_deploy.py remove eqaops-run-a
+```
+
+Replacement first drains and waits up to 70 seconds for actual active work to
+reach zero; a timeout refuses forced replacement. The app then restarts with
+the requested exact lab image while DB/state remain. The deliberate `unready`
+image overrides only its DB port to 1, leaving liveness up but readiness false.
+Its update is expected to produce a **failed receipt**; it remains in that
+state until an explicit rollback, with no automatic retry or replay.
+Rollback is the same bounded process targeting the prior receipt's exact ID.
+`stop` preserves everything. `remove` requires the saved stack receipt and
+unchanged Compose snapshot, removes only its containers/network, and retains
+the database volume and all evidence. Neither command invokes global prune,
+deletes volumes/images, or touches unrelated Docker projects.
