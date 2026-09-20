@@ -4,8 +4,6 @@
 
 本機工作台已接入真實 Olist 歷史資料與 GPT-5.6 Luna，開發驗證與一次正式比較均已完成。40原題嚴格契約成功數為 A固定模板30、B直接SQL23、C業務計畫31；另有24個相依變體。C僅比A多一題，不能推論一般性優勢，共通支援子集以A較穩定。完整結果與評分限制見 [正式報告](reports/formal-luna.md)，工程紀錄見 [工程狀態](docs/status.md)。原始碼已公開於 [kuotunyu/enterprise-query-agent](https://github.com/kuotunyu/enterprise-query-agent)；工作台仍在本機執行。
 
-**開發請只從 [施工總計畫](PROJECT_PLAN.md) 開始。** 它統一目前進度、下一步、驗收與結案條件；其他設計文件按需查閱。
-
 ## 啟動
 
 需要 uv 與已啟動的 Docker Desktop / Docker Engine。命令在本專案根目錄執行。第一次下載 Python 3.12、依賴與 MySQL image 需要網路；mock 查詢不需要 API key。

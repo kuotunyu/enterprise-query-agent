@@ -8,3 +8,6 @@ data/raw/
 *.pyc
 test-results/
 playwright-report/
+/AGENTS.md
+/PROJECT_PLAN.md
+/docs/plans/
