@@ -234,3 +234,103 @@ the database volume and all evidence. Neither command invokes global prune,
 deletes volumes/images, or touches unrelated Docker projects.
 
 The database stays on an internal private network. The app also joins its own ingress bridge so Docker Desktop can realize its host-loopback HTTP publication; no other service joins ingress. Receipts check actual running port bindings, not only requested configuration. The first internal-only deployment failed host readiness despite passing its database oracle; that failed receipt and volume remain preserved.
+
+## Independent measurements
+
+`scripts/ops_measure.py` is a separate host HTTP client. It never imports the
+Service, planner or compiler. Its hand oracle checks July 2018 delivered GMV
+242 BRL, 3 orders and AOV 242/3 from the public synthetic fixture, including
+population and date boundaries. This is engineering verification with a
+deterministic mock, not a model evaluation or production SLA.
+
+Run only one operator/measurement process against a stack. Every invocation
+uses a fresh `.local/ops/runs/<UTC-action-UUID>/` directory. Its manifest records
+the exact runtime image/build receipt/source SHA separately from the host
+runner HEAD, dirty status and file hash. Host runner source snapshots, raw
+JSONL events, failed responses and failed deployment receipts remain local.
+No ask retries or automatic replay occur, including after HTTP timeouts.
+An interrupted/unknown request remains unknown. `summarize` writes a new file
+each time and can recover complete JSONL records from a truncated final line.
+
+Full experiments, **only after task and whole-branch review**, use:
+
+```console
+uv run --locked python scripts/ops_measure.py load eqaops-task2-c --runtime-receipt .local/ops/builds/20260920T131651-build-runtime-395434de.json
+uv run --locked python scripts/ops_measure.py faults eqaops-task2-c --runtime-receipt .local/ops/builds/20260920T131651-build-runtime-395434de.json --bad-receipt .local/ops/builds/20260920T131813-build-unready-63089bbe.json
+uv run --locked python scripts/ops_measure.py soak eqaops-task2-c --runtime-receipt .local/ops/builds/20260920T131651-build-runtime-395434de.json
+uv run --locked python scripts/ops_measure.py summarize .local/ops/runs/<run-id>
+```
+
+These receipts belong to the existing local C stack. On another machine,
+substitute that machine's validated stack and exact successful image receipts.
+Changing only the host harness does not require rebuilding the measured image.
+Do not change the runtime/database/fixture/config during a full experiment.
+
+`load` defaults to 0.25, 0.5, 1 and 2 requests/second, each for 300 seconds,
+with 3 independent repeats: 60 minutes of offered-traffic windows plus setup
+and tail time. Every cell drains actual work, recreates the identical app image
+with a fresh epoch and fixed 1-second mock delay, and precreates at most 300
+sessions. The largest cell offers 600 asks: revision 1 across 300 sessions,
+then revision 2 across them, 150 seconds later. At most 2 asks/session avoids
+the 3-provider/3-SQL task budgets and 500-session cap. Setup traffic is separate.
+A still-active or uncertain earlier request prevents that session's second
+send and is recorded as a generator failure; it is never superseded or delayed.
+
+Arrival deadlines are absolute and independent of response completion.
+Every offered event records schedule lag. Arrivals over 1 second late become
+explicit generator failures instead of a catch-up burst. Summaries distinguish
+offered, sent, terminal client observations, generator failures, unknown sent
+requests, HTTP codes, business outcomes and oracle correctness. Client p50/p95
+use linear interpolation, separately for all/correct/failed observations;
+queue/provider/SQL/total timing distributions retain partial `work_pending`
+flags in raw responses. Final runtime aggregate timings are recorded after
+drain reaches zero. The full window ends before client/server tail accounting.
+`completed` means the experiment finished, not that every request succeeded.
+
+The sampler runs outside the scheduler's event loop via a worker thread.
+It verifies uvicorn at container PID 1, reads that process's `/proc` CPU ticks
+and VmRSS, and reports CPU percent with one core = 100%. CPU is null on the
+first sample or process identity change. RSS is process RSS, not Docker's
+container-memory statistic. `Threads_connected` includes the sampler's own
+short-lived reader connection. Readiness, epoch, sessions, retained requests
+and active jobs accompany samples. Missing/failed samples are null plus error
+types, never zero; sample duration and scheduling gaps are retained. Sampling
+adds DB/CPU overhead. Tail drain intentionally makes readiness false and is
+identified by `metrics.draining`; final normal restoration creates a new epoch.
+
+`faults` defaults to 3 independent repeats of each of five scenarios: database
+stop/recovery, slow provider (5 seconds) with HTTP session cancellation,
+failing provider, in-flight app kill, and unready-image update/rollback.
+Each repetition begins at a fresh epoch and checks the oracle before/after.
+Provider scenarios use saved nonsecret Compose overrides, never arbitrary
+fault/SQL HTTP routes. Fault timestamps, HTTP observations, recovery readiness
+and oracle recovery durations are recorded; old epochs must be rejected after
+app replacement. DB-only restart keeps its epoch, explicitly marked as such.
+Restoration is attempted in `finally` after injection errors. An OS/process
+kill of the harness itself cannot guarantee cleanup: inspect raw evidence and
+use the explicit deployment rollback/start commands before resuming. Failed
+candidates and receipts are retained, and requests are never replayed.
+
+HTTP cancellation here observes deterministic provider delay, **not** long SQL
+cancellation. Separate real-MySQL evidence is the existing
+`tests/test_executor_layers.py::test_explicit_cancel_stops_real_query` and
+`test_default_five_second_deadline_and_no_residual`, recorded by Task 2's
+integration verification. Ordinary compiled synthetic queries are too short
+to make an HTTP-triggered long-SQL cleanup claim.
+
+`soak` defaults to a genuine 86,400-second window with one newly created
+synthetic session every 60 seconds (1,440 offered events). The runner waits
+through the final minute before marking the window complete and captures
+final cache/resource/drain evidence. Sampling records gaps that may indicate
+host sleep, suspension or scheduler delays; wall-clock duration alone cannot
+establish continuous operation. Review missing arrivals, readiness, gaps and
+epoch changes before claiming continuity. The abbreviated diagnostics below
+are never 24-hour evidence. Full load/fault/soak evidence remains pending until
+the controller runs the reviewed package for the prescribed durations.
+
+```console
+uv run --locked python scripts/ops_measure.py smoke eqaops-task2-c --runtime-receipt .local/ops/builds/20260920T131651-build-runtime-395434de.json
+uv run --locked python scripts/ops_measure.py load eqaops-task2-c --runtime-receipt .local/ops/builds/20260920T131651-build-runtime-395434de.json --diagnostic --rates 2 --duration 6 --repeats 1
+uv run --locked python scripts/ops_measure.py faults eqaops-task2-c --runtime-receipt .local/ops/builds/20260920T131651-build-runtime-395434de.json --bad-receipt .local/ops/builds/20260920T131813-build-unready-63089bbe.json --diagnostic --repeats 1
+uv run --locked python scripts/ops_measure.py soak eqaops-task2-c --runtime-receipt .local/ops/builds/20260920T131651-build-runtime-395434de.json --diagnostic --duration 8 --interval 2
+```
