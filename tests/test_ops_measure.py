@@ -193,7 +193,7 @@ def test_session_setup_failure_is_not_counted_as_sent_ask():
     asyncio.run(exercise())
 
 
-@pytest.mark.parametrize('outcome', ['interrupted', 'answered', 'timeout', 'refused', 'early_transport', 'prekill_transport', 'late', 'command_failure'])
+@pytest.mark.parametrize('outcome', ['interrupted', 'answered', 'timeout', 'refused', 'early_transport', 'prekill_transport', 'late_ack', 'command_failure'])
 def test_bounded_kill_rejects_completion_race_and_noninterruption(monkeypatch, outcome):
     from types import SimpleNamespace
     rows = []
@@ -220,14 +220,16 @@ def test_bounded_kill_rejects_completion_race_and_noninterruption(monkeypatch, o
                 time.sleep(.01)  # HTTP completes after active observation, before signal starts.
             started = time.perf_counter()
             loop.call_soon_threadsafe(released.set)
-            return dict(command_started_monotonic=started, command_finished_monotonic=time.perf_counter() + (6 if outcome == 'late' else 0),
+            return dict(command_started_monotonic=started, command_finished_monotonic=time.perf_counter() + (6 if outcome == 'late_ack' else 0),
+                        evidence_finished_monotonic=time.perf_counter() + (6 if outcome == 'late_ack' else 0),
+                        signal_event={'signal': '9', 'elapsed_seconds': .001},
                         state_after={'Status': 'exited', 'ExitCode': 137, 'OOMKilled': False})
         monkeypatch.setattr(m, 'ask', ask)
         monkeypatch.setattr(m, 'request', request)
         run = SimpleNamespace(emit=lambda kind, **kw: rows.append(dict(kind=kind, **kw)))
         lab = SimpleNamespace(kill_container=kill_container)
         call = m.interrupt_request(lab, None, run, {'epoch': 'e', 'session_id': 's'}, {'id': 'pinned'}, 3)
-        if outcome == 'interrupted':
+        if outcome in ('interrupted', 'late_ack'):
             await call
         else:
             with pytest.raises(RuntimeError if outcome == 'command_failure' else AssertionError):
@@ -235,13 +237,51 @@ def test_bounded_kill_rejects_completion_race_and_noninterruption(monkeypatch, o
         assert not [t for t in asyncio.all_tasks() if t is not asyncio.current_task() and not t.done()]
     asyncio.run(exercise())
     observed = next(r for r in rows if r['kind'] == 'fault_observed')
-    assert observed['valid_interruption'] == (outcome == 'interrupted')
-    assert observed['repeat'] == 3 and observed['kill_protocol'] == 'pinned-kill-v1'
+    assert observed['valid_interruption'] == (outcome in ('interrupted', 'late_ack'))
+    assert observed['repeat'] == 3 and observed['kill_protocol'] == 'pinned-kill-v2'
     if outcome == 'answered':
         assert observed['server_outcome'] == 'answered'
 
 
-@pytest.mark.parametrize('scenario', ['valid', 'foreign', 'image', 'oom', 'exit_zero', 'expired', 'command_failure', 'late_finished'])
+@pytest.mark.parametrize('http_finished', [101.0, 106.0])
+def test_late_ack_harvest_uses_actual_http_completion_bound(monkeypatch, http_finished):
+    import threading
+    from types import SimpleNamespace
+    clock = [100.0]
+    monkeypatch.setattr(m.time, 'perf_counter', lambda: clock[0])
+    rows = []
+    async def exercise():
+        release, done = asyncio.Event(), threading.Event()
+        loop = asyncio.get_running_loop()
+        async def ask(*args):
+            await release.wait()
+            clock[0] = http_finished
+            loop.call_soon(done.set)  # Runs after measured_ask records its terminal time.
+            return dict(http=None, outcome='transport_error', body={})
+        async def request(*args):
+            await asyncio.sleep(0)
+            return 200, {'active_jobs': 1}
+        def kill(*args):
+            loop.call_soon_threadsafe(release.set)
+            assert done.wait(1)
+            clock[0] = 108.0  # CLI/evidence returns after the HTTP deadline.
+            return dict(command_started_monotonic=100.0, command_finished_monotonic=108.0,
+                        evidence_finished_monotonic=108.0, signal_event={'signal': '9', 'elapsed_seconds': 1.0},
+                        state_after={'Status': 'exited', 'ExitCode': 137, 'OOMKilled': False})
+        monkeypatch.setattr(m, 'ask', ask)
+        monkeypatch.setattr(m, 'request', request)
+        call = m.interrupt_request(SimpleNamespace(kill_container=kill), None,
+            SimpleNamespace(emit=lambda kind, **kw: rows.append(dict(kind=kind, **kw))), {}, {'id': 'pinned'}, 1)
+        if http_finished <= 105:
+            await call
+        else:
+            with pytest.raises(AssertionError):
+                await call
+    asyncio.run(exercise())
+    assert rows[-1]['valid_interruption'] == (http_finished <= 105)
+
+
+@pytest.mark.parametrize('scenario', ['valid', 'foreign', 'image', 'oom', 'exit_zero', 'expired', 'command_failure', 'late_finished', 'ack_timeout', 'missing_signal', 'late_signal', 'missing_state'])
 def test_pinned_kill_command_checks_scope_process_and_deadline(monkeypatch, tmp_path, scenario):
     import time
     from datetime import datetime, timezone, timedelta
@@ -254,30 +294,44 @@ def test_pinned_kill_command_checks_scope_process_and_deadline(monkeypatch, tmp_
                           'com.docker.compose.service': 'app'}, 'Env': ['SECRET=must-not-be-recorded']},
         HostConfig={'PortBindings': bindings}, NetworkSettings={'Ports': bindings}, Mounts=[])
     commands = []
+    signal_time = None
     def command(args, **kwargs):
+        nonlocal signal_time
         commands.append(args)
-        assert 0 < kwargs['timeout'] <= 3
+        assert 0 < kwargs['timeout'] <= 10
         if args[:2] == ['docker', 'kill']:
             assert args[-1] == cid
             if scenario == 'command_failure':
                 raise RuntimeError('kill failed')
             state.update(Status='exited', Running=False, ExitCode=0 if scenario == 'exit_zero' else 137,
                          OOMKilled=scenario == 'oom', FinishedAt=(datetime.now(timezone.utc) + timedelta(seconds=20)).isoformat() if scenario == 'late_finished' else m.utc())
+            signal_time = time.time_ns() + (6_000_000_000 if scenario == 'late_signal' else 0)
+            if scenario in ('ack_timeout', 'missing_state'):
+                import subprocess
+                raise subprocess.TimeoutExpired(args, 10, output=b'partial-id', stderr=b'partial-warning')
             return cid
+        if args[:2] == ['docker', 'events']:
+            assert '--until' in args and 'container=' + cid in args
+            return '' if scenario == 'missing_signal' else json.dumps({'Action': 'kill', 'Actor': {'ID': cid, 'Attributes': {'signal': '9'}}, 'timeNano': signal_time})
+        if '--format' in args and scenario == 'missing_state':
+            raise RuntimeError('state unavailable')
         return json.dumps(state if '--format' in args else [info])
     monkeypatch.setattr(m.deploy, 'command', command)
     lab = object.__new__(m.Lab)
     lab.path, lab.config, lab.image = tmp_path, dict(stack='eqaops-test', http_port=18012), image
     deadline = time.perf_counter() + (-1 if scenario == 'expired' else 5)
-    if scenario == 'valid':
+    if scenario in ('valid', 'ack_timeout'):
         receipt = lab.kill_container({'id': cid[:12]}, m.utc(), deadline)
         assert receipt['status'] == 'passed' and receipt['state_after']['ExitCode'] == 137
+        if scenario == 'ack_timeout':
+            assert receipt['cli_status'] == 'timeout'
+            assert receipt['partial_stdout'] == 'partial-id'
     else:
         with pytest.raises((RuntimeError, ValueError, TimeoutError)):
             lab.kill_container({'id': cid[:12]}, m.utc(), deadline)
     saved = next((tmp_path / 'receipts').glob('*.json')).read_text()
     assert 'must-not-be-recorded' not in saved
-    assert json.loads(saved)['status'] == ('passed' if scenario == 'valid' else 'failed')
+    assert json.loads(saved)['status'] == ('passed' if scenario in ('valid', 'ack_timeout') else 'failed')
     if scenario in ('foreign', 'image', 'expired'):
         assert not any(args[:2] == ['docker', 'kill'] for args in commands)
 
@@ -341,6 +395,7 @@ def test_kill_recovery_replaces_zero_exit_stopped_container_and_preserves_checks
         started = time.perf_counter()
         compose(tmp_path, {}, ['kill'])
         return dict(command_started_monotonic=started, command_finished_monotonic=time.perf_counter(),
+                    evidence_finished_monotonic=time.perf_counter(), signal_event={'signal': '9', 'elapsed_seconds': .001},
                     state_after={'Status': 'exited', 'ExitCode': 137, 'OOMKilled': False})
     lab.kill_container = kill_container
     monkeypatch.setattr(m.deploy, 'compose', compose)

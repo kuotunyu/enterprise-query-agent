@@ -325,26 +325,35 @@ be reported with the new host runner revision. Runtime image, database, load
 arrival/timing/oracle semantics are unchanged; existing load evidence remains
 applicable. This never replays the interrupted request.
 
-The kill scenario uses protocol `pinned-kill-v1`: only this scenario temporarily
+The kill scenario uses protocol `pinned-kill-v2`: only this scenario temporarily
 sets the existing mock delay to 10 seconds, verified through runtime metadata.
 It pins the receipt-scoped app before starting the ask, observes active work
 with an unfinished HTTP task, and sends one direct `docker kill` to that exact
-container ID. The whole request/injection observation window is 5 seconds;
-the kill command gets at most 3 seconds of the remaining window. No retry is
-permitted. The service still has its unchanged 60-second processing budget
+container ID. HTTP interruption and the daemon's signal9 event must occur in
+the 5-second request window. CLI acknowledgement has a separate 10-second
+timeout; collecting final evidence has a total 15-second window from request
+start. No retry is permitted. The service retains its 60-second processing budget
 (5 seconds is the SQL deadline, not the mock provider deadline).
 
 The command receipt verifies project/service/image, running process, exit137
-without OOM and unchanged process StartedAt. Daemon FinishedAt must lie within
-the recorded host command interval with an explicit 1-second cross-clock
-tolerance; these timestamps bound delivery, not its exact instant. Request
-completion is timestamped in the HTTP task itself. Only a transport error
-after command start, within the 5-second window, plus verified killed process
+without OOM and unchanged process StartedAt. One finite Docker events query
+uses fixed `--since`/`--until` and requires exactly one signal9 event for the
+full pinned ID. Its raw timeNano is retained; host/daemon ordering comparisons
+allow an explicit 1-second clock tolerance. FinishedAt verifies final process
+exit, not signal delivery: daemon exit bookkeeping and CLI acknowledgement
+can lag the interruption. Request completion is timestamped in the HTTP task
+itself. Only a transport error after command start, within the 5-second window,
+plus the verified signal event and killed process
 counts as `valid_interruption=true`. HTTP200 answers, business refusals,
-timeouts, early transport errors and late commands all fail the scenario.
+HTTP timeouts, early transport errors, late signals and missing state/event
+evidence all fail the scenario. A CLI timeout records its status and partial
+streams after subprocess cleanup; it can pass only with all independent
+interruption evidence. Other command failures still fail. A late CLI return
+does not move the actual HTTP completion timestamp or extend its deadline.
 `fault_observed` records repeat, protocol, timing/state evidence and the actual
 response outcome. A received answer is never mislabeled as unknown interruption.
-The local HTTP waiter is always settled/cancelled on failure; server work is
+The bounded command worker finishes before finally recovery begins, including
+reaping a timed-out CLI. The local HTTP waiter is settled/cancelled on failure; server work is
 handled by the existing finally replacement. Recovery verifies default delay1,
 error=false, readiness, a new container/epoch, then oracle and stale rejection.
 
@@ -353,7 +362,9 @@ correct answer completed during a 5.291-second injection block. It changes
 the kill workload/procedure only; keep its runner version with fault results.
 Completed load remains unchanged. Longer mock work alone is not evidence of
 interruption: formal fault completion still requires all 15 scenario ends and
-three distinct repeat1/2/3 valid kill observations under this protocol.
+three distinct repeat1/2/3 valid kill observations under this protocol. The
+prior v1 campaign's 3-second CLI timeout lacks final state evidence and remains
+failed; v2 never retrospectively reclassifies that run.
 
 HTTP cancellation here observes deterministic provider delay, **not** long SQL
 cancellation. Separate real-MySQL evidence is the existing

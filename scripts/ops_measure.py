@@ -12,6 +12,7 @@ from decimal import Decimal, InvalidOperation
 import json
 import math
 from pathlib import Path
+import subprocess
 import sys
 import time
 from uuid import uuid4
@@ -26,6 +27,8 @@ RATES = [.25, .5, 1, 2]
 FAULTS = ['db', 'provider-slow', 'provider-error', 'kill', 'rollback']
 KILL_DELAY_SECONDS = 10
 KILL_WINDOW_SECONDS = 5
+KILL_CLI_SECONDS = 10
+KILL_EVIDENCE_SECONDS = 15
 
 
 def utc():
@@ -294,8 +297,9 @@ class Lab:
 
     def kill_container(self, pinned, request_started_utc, deadline):
         """One scoped signal command; no retries, and no secret-bearing inspect output saved."""
-        def remaining(limit):
-            value = deadline - time.perf_counter()
+        evidence_deadline = deadline + KILL_EVIDENCE_SECONDS - KILL_WINDOW_SECONDS
+        def remaining(limit, *, collection=False):
+            value = (evidence_deadline if collection else deadline) - time.perf_counter()
             if value <= 0:
                 raise TimeoutError('Kill injection window expired')
             return min(limit, value)
@@ -308,22 +312,52 @@ class Lab:
                 raise RuntimeError('Pinned app identity/state changed before kill')
             receipt.update(container_id=info['Id'], image=self.image, state_before=info['State'],
                            command_started_utc=utc(), command_started_monotonic=time.perf_counter())
-            receipt['output'] = deploy.command(['docker', 'kill', '--signal', 'KILL', info['Id']],
-                                               timeout=remaining(3), combined=True)
+            remaining(1)  # Dispatch itself must still be inside the 5s interruption window.
+            try:
+                receipt['output'] = deploy.command(['docker', 'kill', '--signal', 'KILL', info['Id']],
+                    timeout=remaining(KILL_CLI_SECONDS, collection=True), combined=True)
+                receipt['cli_status'] = 'completed'
+            except subprocess.TimeoutExpired as exc:
+                # subprocess.run has killed/reaped this CLI before raising. Never retry.
+                receipt['cli_status'] = 'timeout'
+                for name, value in [('partial_stdout', exc.output), ('partial_stderr', exc.stderr)]:
+                    receipt[name] = value.decode('utf-8', errors='replace') if isinstance(value, bytes) else value
             receipt.update(command_finished_utc=utc(), command_finished_monotonic=time.perf_counter())
             receipt['state_after'] = json.loads(deploy.command(
-                ['docker', 'inspect', '--format', '{{json .State}}', info['Id']], timeout=remaining(1)))
+                ['docker', 'inspect', '--format', '{{json .State}}', info['Id']], timeout=remaining(3, collection=True)))
+            # One finite event query, not a watch or retry. Save only selected nonsecret fields.
+            receipt['events_until_utc'] = utc()
+            events = deploy.command(['docker', 'events', '--since', request_started_utc,
+                '--until', receipt['events_until_utc'], '--filter', 'container=' + info['Id'],
+                '--filter', 'event=kill', '--format', '{{json .}}'], timeout=remaining(3, collection=True))
+            signals = []
+            for line in events.splitlines():
+                event = json.loads(line)
+                actor = event.get('Actor', {})
+                if (event.get('Action') == 'kill' and actor.get('ID') == info['Id']
+                        and actor.get('Attributes', {}).get('signal') == '9'
+                        and type(event.get('timeNano')) is int):
+                    signals.append({'container_id': actor['ID'], 'signal': '9', 'time_nano': event['timeNano']})
+            receipt['signal_events'] = signals
+            if len(signals) != 1:
+                raise RuntimeError('A unique pinned-container signal9 event was not verified')
             state = receipt['state_after']
             parse = lambda value: datetime.fromisoformat(value.replace('Z', '+00:00'))
-            # Docker daemon and host clocks are compared with an explicit 1s tolerance.
+            signal_time = datetime.fromtimestamp(signals[0]['time_nano'] / 1e9, timezone.utc)
+            receipt['signal_event'] = dict(signals[0], utc=signal_time.isoformat(),
+                elapsed_seconds=(signal_time - parse(request_started_utc)).total_seconds())
+            # Signal-event timing is distinct from daemon exit bookkeeping and CLI acknowledgement.
             tolerance = timedelta(seconds=1)
             if (state['Status'] != 'exited' or state['ExitCode'] != 137 or state['OOMKilled']
                     or state['StartedAt'] != receipt['state_before']['StartedAt']
                     or parse(state['StartedAt']) > parse(request_started_utc)
-                    or not parse(receipt['command_started_utc']) - tolerance <= parse(state['FinishedAt'])
-                           <= parse(receipt['command_finished_utc']) + tolerance):
+                    or not 0 <= receipt['signal_event']['elapsed_seconds'] <= KILL_WINDOW_SECONDS
+                    or signal_time < parse(receipt['command_started_utc']) - tolerance
+                    or not signal_time - tolerance <= parse(state['FinishedAt'])
+                           <= parse(receipt['events_until_utc']) + tolerance):
                 raise RuntimeError('Pinned process exit/timing does not demonstrate the requested kill')
-            remaining(1)
+            receipt['evidence_finished_monotonic'] = time.perf_counter()
+            remaining(1, collection=True)
         return receipt
 
 
@@ -441,10 +475,13 @@ async def interrupt_request(lab, client, run, state, pinned, repeat):
         if task.done() or active_at is None:
             raise AssertionError('Request completed before kill dispatch')
         evidence = await asyncio.to_thread(lab.kill_container, pinned, started_utc, deadline)
-        result = await asyncio.wait_for(asyncio.shield(task), remaining())
+        result = await task if task.done() else await asyncio.wait_for(asyncio.shield(task), remaining())
         valid = (result['http'] is None and result['outcome'] == 'transport_error'
                  and active_at <= evidence['command_started_monotonic'] <= ended <= deadline
-                 and evidence['command_finished_monotonic'] <= deadline
+                 and evidence['evidence_finished_monotonic'] <= started + KILL_EVIDENCE_SECONDS
+                 and evidence['signal_event']['signal'] == '9'
+                 and 0 <= evidence['signal_event']['elapsed_seconds'] <= KILL_WINDOW_SECONDS
+                 and evidence['signal_event']['elapsed_seconds'] <= ended - started + 1
                  and evidence['state_after']['Status'] == 'exited'
                  and evidence['state_after']['ExitCode'] == 137
                  and not evidence['state_after']['OOMKilled'])
@@ -455,13 +492,14 @@ async def interrupt_request(lab, client, run, state, pinned, repeat):
             task.cancel()  # Local waiter only; outer fault finally restores/kills actual server work.
         await asyncio.gather(task, return_exceptions=True)
         result = observed or dict(http=None, outcome='not_observed', body={})
-        run.emit('fault_observed', scenario='kill', repeat=repeat, kill_protocol='pinned-kill-v1',
+        run.emit('fault_observed', scenario='kill', repeat=repeat, kill_protocol='pinned-kill-v2',
                  valid_interruption=valid, result=result,
                  server_outcome=result['outcome'] if result['http'] is not None else 'unknown; no replay',
                  request_started_monotonic=started, request_started_utc=started_utc,
                  request_finished_monotonic=ended, active_observed_monotonic=active_at,
                  request_pending_before_kill=active_at is not None, kill_evidence=evidence,
-                 provider_delay_seconds=KILL_DELAY_SECONDS, window_seconds=KILL_WINDOW_SECONDS)
+                 provider_delay_seconds=KILL_DELAY_SECONDS, window_seconds=KILL_WINDOW_SECONDS,
+                 cli_timeout_seconds=KILL_CLI_SECONDS, evidence_window_seconds=KILL_EVIDENCE_SECONDS)
 
 
 async def fault(lab, client, run, name, repeat, bad_receipt):
