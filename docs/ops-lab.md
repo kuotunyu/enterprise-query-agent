@@ -325,6 +325,36 @@ be reported with the new host runner revision. Runtime image, database, load
 arrival/timing/oracle semantics are unchanged; existing load evidence remains
 applicable. This never replays the interrupted request.
 
+The kill scenario uses protocol `pinned-kill-v1`: only this scenario temporarily
+sets the existing mock delay to 10 seconds, verified through runtime metadata.
+It pins the receipt-scoped app before starting the ask, observes active work
+with an unfinished HTTP task, and sends one direct `docker kill` to that exact
+container ID. The whole request/injection observation window is 5 seconds;
+the kill command gets at most 3 seconds of the remaining window. No retry is
+permitted. The service still has its unchanged 60-second processing budget
+(5 seconds is the SQL deadline, not the mock provider deadline).
+
+The command receipt verifies project/service/image, running process, exit137
+without OOM and unchanged process StartedAt. Daemon FinishedAt must lie within
+the recorded host command interval with an explicit 1-second cross-clock
+tolerance; these timestamps bound delivery, not its exact instant. Request
+completion is timestamped in the HTTP task itself. Only a transport error
+after command start, within the 5-second window, plus verified killed process
+counts as `valid_interruption=true`. HTTP200 answers, business refusals,
+timeouts, early transport errors and late commands all fail the scenario.
+`fault_observed` records repeat, protocol, timing/state evidence and the actual
+response outcome. A received answer is never mislabeled as unknown interruption.
+The local HTTP waiter is always settled/cancelled on failure; server work is
+handled by the existing finally replacement. Recovery verifies default delay1,
+error=false, readiness, a new container/epoch, then oracle and stale rejection.
+
+This synchronization change addresses the observed race where a 1.052-second
+correct answer completed during a 5.291-second injection block. It changes
+the kill workload/procedure only; keep its runner version with fault results.
+Completed load remains unchanged. Longer mock work alone is not evidence of
+interruption: formal fault completion still requires all 15 scenario ends and
+three distinct repeat1/2/3 valid kill observations under this protocol.
+
 HTTP cancellation here observes deterministic provider delay, **not** long SQL
 cancellation. Separate real-MySQL evidence is the existing
 `tests/test_executor_layers.py::test_explicit_cancel_stops_real_query` and

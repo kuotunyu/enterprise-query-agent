@@ -7,7 +7,7 @@ abbreviated experiments. Run this process separately from the application.
 import argparse
 import asyncio
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal, InvalidOperation
 import json
 import math
@@ -24,6 +24,8 @@ from scripts import ops_deploy as deploy
 QUESTION = '2018年7月GMV、訂單數與AOV'
 RATES = [.25, .5, 1, 2]
 FAULTS = ['db', 'provider-slow', 'provider-error', 'kill', 'rollback']
+KILL_DELAY_SECONDS = 10
+KILL_WINDOW_SECONDS = 5
 
 
 def utc():
@@ -290,6 +292,40 @@ class Lab:
             return dict(cpu_seconds=None, rss_bytes=None, process_identity=None,
                         db_connections=None, errors=[type(exc).__name__])
 
+    def kill_container(self, pinned, request_started_utc, deadline):
+        """One scoped signal command; no retries, and no secret-bearing inspect output saved."""
+        def remaining(limit):
+            value = deadline - time.perf_counter()
+            if value <= 0:
+                raise TimeoutError('Kill injection window expired')
+            return min(limit, value)
+        with deploy.operation(self.path / 'receipts', 'measurement-kill-command') as receipt:
+            info = json.loads(deploy.command(['docker', 'inspect', pinned['id']], timeout=remaining(1)))[0]
+            deploy.check_container(info, self.config['stack'], self.config['http_port'])
+            labels = info['Config']['Labels']
+            if (labels.get('com.docker.compose.service') != 'app' or info['Image'] != self.image
+                    or not info['Id'].startswith(pinned['id']) or not info['State']['Running']):
+                raise RuntimeError('Pinned app identity/state changed before kill')
+            receipt.update(container_id=info['Id'], image=self.image, state_before=info['State'],
+                           command_started_utc=utc(), command_started_monotonic=time.perf_counter())
+            receipt['output'] = deploy.command(['docker', 'kill', '--signal', 'KILL', info['Id']],
+                                               timeout=remaining(3), combined=True)
+            receipt.update(command_finished_utc=utc(), command_finished_monotonic=time.perf_counter())
+            receipt['state_after'] = json.loads(deploy.command(
+                ['docker', 'inspect', '--format', '{{json .State}}', info['Id']], timeout=remaining(1)))
+            state = receipt['state_after']
+            parse = lambda value: datetime.fromisoformat(value.replace('Z', '+00:00'))
+            # Docker daemon and host clocks are compared with an explicit 1s tolerance.
+            tolerance = timedelta(seconds=1)
+            if (state['Status'] != 'exited' or state['ExitCode'] != 137 or state['OOMKilled']
+                    or state['StartedAt'] != receipt['state_before']['StartedAt']
+                    or parse(state['StartedAt']) > parse(request_started_utc)
+                    or not parse(receipt['command_started_utc']) - tolerance <= parse(state['FinishedAt'])
+                           <= parse(receipt['command_finished_utc']) + tolerance):
+                raise RuntimeError('Pinned process exit/timing does not demonstrate the requested kill')
+            remaining(1)
+        return receipt
+
 
 async def request(client, method, endpoint, body=None):
     try:
@@ -380,6 +416,54 @@ async def stale(client, state, run):
         raise AssertionError('Old epoch was not rejected')
 
 
+async def interrupt_request(lab, client, run, state, pinned, repeat):
+    started, started_utc = time.perf_counter(), utc()
+    deadline = started + KILL_WINDOW_SECONDS
+    observed, ended, active_at, evidence, valid = None, None, None, None, False
+    async def measured_ask():
+        nonlocal observed, ended
+        observed = await ask(client, state)
+        ended = time.perf_counter()  # At task completion, not when the caller later awaits it.
+        return observed
+    task = asyncio.create_task(measured_ask())
+    def remaining():
+        value = deadline - time.perf_counter()
+        if value <= 0:
+            raise TimeoutError('Kill injection window expired')
+        return value
+    try:
+        while not task.done():
+            status, metrics = await asyncio.wait_for(request(client, 'GET', '/ops/metrics'), remaining())
+            if status == 200 and metrics.get('active_jobs', 0) and not task.done():
+                active_at = time.perf_counter()
+                break
+            await asyncio.sleep(min(.02, remaining()))
+        if task.done() or active_at is None:
+            raise AssertionError('Request completed before kill dispatch')
+        evidence = await asyncio.to_thread(lab.kill_container, pinned, started_utc, deadline)
+        result = await asyncio.wait_for(asyncio.shield(task), remaining())
+        valid = (result['http'] is None and result['outcome'] == 'transport_error'
+                 and active_at <= evidence['command_started_monotonic'] <= ended <= deadline
+                 and evidence['command_finished_monotonic'] <= deadline
+                 and evidence['state_after']['Status'] == 'exited'
+                 and evidence['state_after']['ExitCode'] == 137
+                 and not evidence['state_after']['OOMKilled'])
+        if not valid:
+            raise AssertionError('Kill did not produce a bounded transport interruption')
+    finally:
+        if not task.done():
+            task.cancel()  # Local waiter only; outer fault finally restores/kills actual server work.
+        await asyncio.gather(task, return_exceptions=True)
+        result = observed or dict(http=None, outcome='not_observed', body={})
+        run.emit('fault_observed', scenario='kill', repeat=repeat, kill_protocol='pinned-kill-v1',
+                 valid_interruption=valid, result=result,
+                 server_outcome=result['outcome'] if result['http'] is not None else 'unknown; no replay',
+                 request_started_monotonic=started, request_started_utc=started_utc,
+                 request_finished_monotonic=ended, active_observed_monotonic=active_at,
+                 request_pending_before_kill=active_at is not None, kill_evidence=evidence,
+                 provider_delay_seconds=KILL_DELAY_SECONDS, window_seconds=KILL_WINDOW_SECONDS)
+
+
 async def fault(lab, client, run, name, repeat, bad_receipt):
     start = time.perf_counter()
     run.emit('fault_start', scenario=name, repeat=repeat)
@@ -412,21 +496,14 @@ async def fault(lab, client, run, name, repeat, bad_receipt):
             if result['outcome'] != expected or not no_answer(result['body']):
                 raise AssertionError('Provider fault outcome mismatch')
         elif name == 'kill':
+            meta = await asyncio.to_thread(lab.restart, KILL_DELAY_SECONDS)
+            if meta.get('provider_delay_seconds') != KILL_DELAY_SECONDS or meta.get('provider_error'):
+                raise RuntimeError('Kill-specific mock configuration was not confirmed')
             state = await session(client)
-            task = asyncio.create_task(ask(client, state))
-            deadline = time.perf_counter() + 3
-            while time.perf_counter() < deadline:
-                _, metrics = await request(client, 'GET', '/ops/metrics')
-                if metrics.get('active_jobs', 0):
-                    break
-                await asyncio.sleep(.02)
-            else:
-                raise AssertionError('No in-flight job observed')
-            await asyncio.to_thread(deploy.compose, lab.path, lab.config, ['kill', '-s', 'KILL', 'app'])
-            result = await task
-            run.emit('fault_observed', scenario=name, result=result, server_outcome='unknown; no replay')
-            if result['http'] is not None and not no_answer(result['body']):
-                raise AssertionError('Kill did not interrupt observed request')
+            old = state
+            pinned = next(r for r in await asyncio.to_thread(lab.check) if r['name'].endswith('-app-1'))
+            run.emit('kill_setup', repeat=repeat, meta=meta, pinned=pinned)
+            await interrupt_request(lab, client, run, state, pinned, repeat)
         else:
             try:
                 await asyncio.to_thread(deploy.manage, lab.config['stack'], 'update', bad_receipt)
@@ -469,6 +546,10 @@ async def fault(lab, client, run, name, repeat, bad_receipt):
                 receipt['readiness'] = await asyncio.to_thread(deploy.wait_ready, lab.config)
                 if not receipt['readiness'].get('epoch') or receipt['readiness']['epoch'] == old['epoch']:
                     raise RuntimeError('Killed app recovery did not create a new epoch')
+                status, receipt['meta'] = await request(client, 'GET', '/ops/meta')
+                if (status != 200 or receipt['meta'].get('provider_delay_seconds') != 1
+                        or receipt['meta'].get('provider_error')):
+                    raise RuntimeError('Kill recovery did not restore normal mock configuration')
             run.emit('kill_recovery', **receipt)
         else:
             await asyncio.to_thread(lab.restart)

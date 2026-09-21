@@ -193,6 +193,95 @@ def test_session_setup_failure_is_not_counted_as_sent_ask():
     asyncio.run(exercise())
 
 
+@pytest.mark.parametrize('outcome', ['interrupted', 'answered', 'timeout', 'refused', 'early_transport', 'prekill_transport', 'late', 'command_failure'])
+def test_bounded_kill_rejects_completion_race_and_noninterruption(monkeypatch, outcome):
+    from types import SimpleNamespace
+    rows = []
+    async def exercise():
+        loop = asyncio.get_running_loop()
+        released = asyncio.Event()
+        async def ask(*args):
+            if outcome != 'early_transport':
+                await released.wait()
+            if outcome == 'answered':
+                return dict(http=200, outcome='answered', body=good_answer(), correct=True)
+            if outcome == 'refused':
+                return dict(http=200, outcome='timeout', body={'answer': {'status': 'timeout', 'facts': []}})
+            return dict(http=None, outcome='transport_timeout' if outcome == 'timeout' else 'transport_error', body={})
+        async def request(*args):
+            await asyncio.sleep(0)
+            return 200, {'active_jobs': 1}
+        def kill_container(*args):
+            import time
+            if outcome == 'command_failure':
+                raise RuntimeError('No signal sent')
+            if outcome == 'prekill_transport':
+                loop.call_soon_threadsafe(released.set)
+                time.sleep(.01)  # HTTP completes after active observation, before signal starts.
+            started = time.perf_counter()
+            loop.call_soon_threadsafe(released.set)
+            return dict(command_started_monotonic=started, command_finished_monotonic=time.perf_counter() + (6 if outcome == 'late' else 0),
+                        state_after={'Status': 'exited', 'ExitCode': 137, 'OOMKilled': False})
+        monkeypatch.setattr(m, 'ask', ask)
+        monkeypatch.setattr(m, 'request', request)
+        run = SimpleNamespace(emit=lambda kind, **kw: rows.append(dict(kind=kind, **kw)))
+        lab = SimpleNamespace(kill_container=kill_container)
+        call = m.interrupt_request(lab, None, run, {'epoch': 'e', 'session_id': 's'}, {'id': 'pinned'}, 3)
+        if outcome == 'interrupted':
+            await call
+        else:
+            with pytest.raises(RuntimeError if outcome == 'command_failure' else AssertionError):
+                await call
+        assert not [t for t in asyncio.all_tasks() if t is not asyncio.current_task() and not t.done()]
+    asyncio.run(exercise())
+    observed = next(r for r in rows if r['kind'] == 'fault_observed')
+    assert observed['valid_interruption'] == (outcome == 'interrupted')
+    assert observed['repeat'] == 3 and observed['kill_protocol'] == 'pinned-kill-v1'
+    if outcome == 'answered':
+        assert observed['server_outcome'] == 'answered'
+
+
+@pytest.mark.parametrize('scenario', ['valid', 'foreign', 'image', 'oom', 'exit_zero', 'expired', 'command_failure', 'late_finished'])
+def test_pinned_kill_command_checks_scope_process_and_deadline(monkeypatch, tmp_path, scenario):
+    import time
+    from datetime import datetime, timezone, timedelta
+    cid, image = 'a' * 64, 'sha256:runtime'
+    started = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
+    state = dict(Status='running', Running=True, ExitCode=0, OOMKilled=False, StartedAt=started)
+    bindings = {'8011/tcp': [{'HostIp': '127.0.0.1', 'HostPort': '18012'}]}
+    info = dict(Id=cid, Image='other' if scenario == 'image' else image, State=state,
+        Config={'Labels': {'com.docker.compose.project': 'foreign' if scenario == 'foreign' else 'eqaops-test',
+                          'com.docker.compose.service': 'app'}, 'Env': ['SECRET=must-not-be-recorded']},
+        HostConfig={'PortBindings': bindings}, NetworkSettings={'Ports': bindings}, Mounts=[])
+    commands = []
+    def command(args, **kwargs):
+        commands.append(args)
+        assert 0 < kwargs['timeout'] <= 3
+        if args[:2] == ['docker', 'kill']:
+            assert args[-1] == cid
+            if scenario == 'command_failure':
+                raise RuntimeError('kill failed')
+            state.update(Status='exited', Running=False, ExitCode=0 if scenario == 'exit_zero' else 137,
+                         OOMKilled=scenario == 'oom', FinishedAt=(datetime.now(timezone.utc) + timedelta(seconds=20)).isoformat() if scenario == 'late_finished' else m.utc())
+            return cid
+        return json.dumps(state if '--format' in args else [info])
+    monkeypatch.setattr(m.deploy, 'command', command)
+    lab = object.__new__(m.Lab)
+    lab.path, lab.config, lab.image = tmp_path, dict(stack='eqaops-test', http_port=18012), image
+    deadline = time.perf_counter() + (-1 if scenario == 'expired' else 5)
+    if scenario == 'valid':
+        receipt = lab.kill_container({'id': cid[:12]}, m.utc(), deadline)
+        assert receipt['status'] == 'passed' and receipt['state_after']['ExitCode'] == 137
+    else:
+        with pytest.raises((RuntimeError, ValueError, TimeoutError)):
+            lab.kill_container({'id': cid[:12]}, m.utc(), deadline)
+    saved = next((tmp_path / 'receipts').glob('*.json')).read_text()
+    assert 'must-not-be-recorded' not in saved
+    assert json.loads(saved)['status'] == ('passed' if scenario == 'valid' else 'failed')
+    if scenario in ('foreign', 'image', 'expired'):
+        assert not any(args[:2] == ['docker', 'kill'] for args in commands)
+
+
 @pytest.mark.parametrize('replacement_starts,readiness_fails', [(True, False), (False, False), (True, True)])
 def test_kill_recovery_replaces_zero_exit_stopped_container_and_preserves_checks(monkeypatch, tmp_path, replacement_starts, readiness_fails):
     """Model the observed boundary: normal Compose up succeeds without a start.
@@ -210,7 +299,7 @@ def test_kill_recovery_replaces_zero_exit_stopped_container_and_preserves_checks
         return [dict(name='/eqaops-test-app-1', id=state['container'], image=image,
                      state='running' if state['running'] else 'exited')]
     lab = SimpleNamespace(path=tmp_path, config={}, image=image,
-                          restart=lambda: {}, check=resources)
+                          restart=lambda delay=1: {'provider_delay_seconds': delay, 'provider_error': False}, check=resources)
     def compose(path, config, args, **kwargs):
         commands.append(args)
         if args[0] == 'kill':
@@ -237,14 +326,23 @@ def test_kill_recovery_replaces_zero_exit_stopped_container_and_preserves_checks
     async def session(client):
         return {'epoch': state['epoch'], 'session_id': 'inflight'}
     async def ask(client, identity, revision=1):
-        requests.append(identity['session_id'])
+        requests.append((identity['session_id'], revision))
         if identity['epoch'] != state['epoch']:
             return dict(http=409, outcome='stale_epoch')
         state['active'] = True
         await killed.wait()
         return dict(http=None, outcome='transport_error', body={}, correct=False)
     async def request(*args, **kwargs):
+        if args[-1] == '/ops/meta':
+            return 200, {'provider_delay_seconds': 1, 'provider_error': False}
         return 200, {'active_jobs': int(state['active'])}
+    def kill_container(*args):
+        import time
+        started = time.perf_counter()
+        compose(tmp_path, {}, ['kill'])
+        return dict(command_started_monotonic=started, command_finished_monotonic=time.perf_counter(),
+                    state_after={'Status': 'exited', 'ExitCode': 137, 'OOMKilled': False})
+    lab.kill_container = kill_container
     monkeypatch.setattr(m.deploy, 'compose', compose)
     monkeypatch.setattr(m.deploy, 'wait_ready', ready)
     monkeypatch.setattr(m, 'probe', probe)
@@ -266,7 +364,7 @@ def test_kill_recovery_replaces_zero_exit_stopped_container_and_preserves_checks
     if succeeds:
         assert state['container'] == 'replacement'
         assert probes == ['kill:before', 'kill:after']
-        assert requests == ['inflight', 'kill:before']  # Interrupted ask never replayed.
+        assert requests == [('inflight', 1), ('inflight', 2)]  # Second is the explicit stale probe.
         assert any(r['kind'] == 'old_epoch_probe' and r['result']['http'] == 409 for r in rows)
         assert any(r['kind'] == 'fault_end' and r['status'] == 'passed' for r in rows)
     else:
