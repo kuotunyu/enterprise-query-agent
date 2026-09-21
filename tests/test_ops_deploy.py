@@ -121,6 +121,22 @@ def test_command_keeps_json_stdout_separate_and_redacts_failed_output():
     assert 'synthetic-secret' not in str(error.value)
 
 
+def test_compose_success_stderr_capture_is_opt_in_and_redacted(monkeypatch, tmp_path):
+    deployment = module()
+    (tmp_path / 'runtime.env').write_text('EQA_DB_PASSWORD=synthetic-secret\n')
+    (tmp_path / 'mysql.env').write_text('MYSQL_ROOT_PASSWORD=synthetic-secret\n')
+    config = dict(stack='eqaops-test', http_port=18012, initial_image_id='fixed', mysql_image={'id': 'mysql'})
+    original = deployment.command
+    def substitute_child(args, **kwargs):
+        return original([sys.executable, '-c',
+            'import sys; print("{}"); print("Started synthetic-secret", file=sys.stderr)'], **kwargs)
+    monkeypatch.setattr(deployment, 'command', substitute_child)
+    assert json.loads(deployment.compose(tmp_path, config, ['up'])) == {}
+    output = deployment.compose(tmp_path, config, ['up'], combined=True)
+    assert 'Started [REDACTED]' in output
+    assert 'synthetic-secret' not in output
+
+
 def test_drain_timeout_never_reports_lingering_job_as_stopped(monkeypatch):
     deployment = module()
     responses = iter([(200, {'outstanding_jobs': 1}), (200, {'active_jobs': 1})])

@@ -184,7 +184,7 @@ def load_stack(name):
     return path, config
 
 
-def compose(path, config, args, image=None, timeout=300):
+def compose(path, config, args, image=None, timeout=300, combined=False):
     env = {k: v for k, v in os.environ.items() if not k.startswith(('EQA_', 'COMPOSE_'))}
     env.update(EQA_OPS_STACK_DIR=path.as_posix(), EQA_OPS_HTTP_PORT=str(config['http_port']),
                EQA_OPS_APP_IMAGE=image or config['initial_image_id'],
@@ -196,7 +196,7 @@ def compose(path, config, args, image=None, timeout=300):
                 hidden.append(line.split('=', 1)[1])
     return command(['docker', 'compose', '--project-name', config['stack'], '--env-file',
                     str(path / 'compose.env'), '-f', str(path / 'compose.ops.yaml'), *args],
-                   env=env, timeout=timeout, redact=hidden)
+                   env=env, timeout=timeout, redact=hidden, combined=combined)
 
 
 def check_container(info, name, port):

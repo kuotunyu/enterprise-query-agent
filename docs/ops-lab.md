@@ -311,6 +311,20 @@ kill of the harness itself cannot guarantee cleanup: inspect raw evidence and
 use the explicit deployment rollback/start commands before resuming. Failed
 candidates and receipts are retained, and requests are never replayed.
 
+App-kill recovery explicitly recreates only the app with the same immutable
+image, then verifies a new running container, readiness and a new epoch before
+recording recovery success. Its separate `measurement-kill-recovery` receipt
+retains pre/post resources and redacted Compose stdout plus stderr, including
+successful-command stderr (opt-in; normal JSON stdout consumers are unchanged).
+The completed campaign's first kill recovery had returned from generic Compose
+`up` but left the app exited; the original command streams were unavailable,
+and a later identical recovery succeeded. The Docker/Compose trigger remains
+unresolved. Explicit replacement is a narrow recovery mitigation, not a proven
+fix to an upstream cause. It changes the measured recovery procedure and must
+be reported with the new host runner revision. Runtime image, database, load
+arrival/timing/oracle semantics are unchanged; existing load evidence remains
+applicable. This never replays the interrupted request.
+
 HTTP cancellation here observes deterministic provider delay, **not** long SQL
 cancellation. Separate real-MySQL evidence is the existing
 `tests/test_executor_layers.py::test_explicit_cancel_stops_real_query` and

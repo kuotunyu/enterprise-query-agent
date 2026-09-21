@@ -454,10 +454,26 @@ async def fault(lab, client, run, name, repeat, bad_receipt):
         elif name == 'rollback':
             await asyncio.to_thread(deploy.manage, lab.config['stack'], 'rollback', str(lab.receipt_path))
         elif name == 'kill':
-            await asyncio.to_thread(deploy.compose, lab.path, lab.config, ['up', '-d', '--no-deps', 'app'], image=lab.image)
+            # A successful generic Compose up did not restart one killed app.
+            # Replace explicitly, retain the command output, and verify lifecycle.
+            with deploy.operation(lab.path / 'receipts', 'measurement-kill-recovery') as receipt:
+                receipt['before'] = await asyncio.to_thread(lab.check)
+                receipt['image'] = lab.image
+                receipt['replace'] = await asyncio.to_thread(deploy.compose, lab.path, lab.config,
+                    ['up', '-d', '--no-deps', '--force-recreate', 'app'], image=lab.image, combined=True)
+                receipt['after'] = await asyncio.to_thread(lab.check)
+                prior = next(r for r in receipt['before'] if r['name'].endswith('-app-1'))
+                current = next(r for r in receipt['after'] if r['name'].endswith('-app-1'))
+                if current['id'] == prior['id'] or current['state'] != 'running':
+                    raise RuntimeError('Killed app recovery did not create a new running container')
+                receipt['readiness'] = await asyncio.to_thread(deploy.wait_ready, lab.config)
+                if not receipt['readiness'].get('epoch') or receipt['readiness']['epoch'] == old['epoch']:
+                    raise RuntimeError('Killed app recovery did not create a new epoch')
+            run.emit('kill_recovery', **receipt)
         else:
             await asyncio.to_thread(lab.restart)
-        await asyncio.to_thread(deploy.wait_ready, lab.config)
+        if name != 'kill':
+            await asyncio.to_thread(deploy.wait_ready, lab.config)
         run.emit('recovery_ready', scenario=name, seconds=time.perf_counter()-recovery)
     await probe(client, run, name + ':after')
     if name != 'db':

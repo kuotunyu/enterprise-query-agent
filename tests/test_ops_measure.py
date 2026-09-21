@@ -191,3 +191,88 @@ def test_session_setup_failure_is_not_counted_as_sent_ask():
         summary = m.summarize_rows(rows)
         assert (summary['offered'], summary['sent'], summary['generator_failures']) == (1, 0, 1)
     asyncio.run(exercise())
+
+
+@pytest.mark.parametrize('replacement_starts,readiness_fails', [(True, False), (False, False), (True, True)])
+def test_kill_recovery_replaces_zero_exit_stopped_container_and_preserves_checks(monkeypatch, tmp_path, replacement_starts, readiness_fails):
+    """Model the observed boundary: normal Compose up succeeds without a start.
+
+    This does not claim to reproduce the unidentified Docker/Compose trigger.
+    It checks orchestration state/oracle/epoch outcomes, not just CLI flags.
+    """
+    from types import SimpleNamespace
+    state = dict(running=True, active=False, epoch='before', container='original')
+    commands, rows, probes, requests = [], [], [], []
+    killed = None
+    image = 'sha256:fixed-runtime'
+    succeeds = replacement_starts and not readiness_fails
+    def resources():
+        return [dict(name='/eqaops-test-app-1', id=state['container'], image=image,
+                     state='running' if state['running'] else 'exited')]
+    lab = SimpleNamespace(path=tmp_path, config={}, image=image,
+                          restart=lambda: {}, check=resources)
+    def compose(path, config, args, **kwargs):
+        commands.append(args)
+        if args[0] == 'kill':
+            state.update(running=False, active=False)
+            loop.call_soon_threadsafe(killed.set)
+            return 'Killed'
+        if args[0] == 'up':
+            assert kwargs['image'] == image
+            if '--force-recreate' in args:
+                state.update(container='replacement', epoch='after', running=replacement_starts)
+            # Generic up intentionally returns zero output without changing state.
+            return 'Recreated; Started' if state['running'] else ''
+        raise AssertionError(args)
+    def ready(config):
+        if not state['running']:
+            raise RuntimeError('App remains exited after successful Compose command')
+        if readiness_fails:
+            raise RuntimeError('New container running but readiness failed')
+        return {'epoch': state['epoch'], 'ready': True}
+    async def probe(client, run, label, **kwargs):
+        assert state['running']
+        probes.append(label)
+        return {'epoch': state['epoch'], 'session_id': label}, {'correct': True}
+    async def session(client):
+        return {'epoch': state['epoch'], 'session_id': 'inflight'}
+    async def ask(client, identity, revision=1):
+        requests.append(identity['session_id'])
+        if identity['epoch'] != state['epoch']:
+            return dict(http=409, outcome='stale_epoch')
+        state['active'] = True
+        await killed.wait()
+        return dict(http=None, outcome='transport_error', body={}, correct=False)
+    async def request(*args, **kwargs):
+        return 200, {'active_jobs': int(state['active'])}
+    monkeypatch.setattr(m.deploy, 'compose', compose)
+    monkeypatch.setattr(m.deploy, 'wait_ready', ready)
+    monkeypatch.setattr(m, 'probe', probe)
+    monkeypatch.setattr(m, 'session', session)
+    monkeypatch.setattr(m, 'ask', ask)
+    monkeypatch.setattr(m, 'request', request)
+    run = SimpleNamespace(emit=lambda kind, **kw: rows.append(dict(kind=kind, **kw)))
+    async def exercise():
+        nonlocal loop, killed
+        loop, killed = asyncio.get_running_loop(), asyncio.Event()
+        if succeeds:
+            await m.fault(lab, None, run, 'kill', 1, None)
+        else:
+            with pytest.raises(RuntimeError):
+                await m.fault(lab, None, run, 'kill', 1, None)
+    loop = None
+    asyncio.run(exercise())
+    assert len([args for args in commands if args[0] == 'up']) == 1  # No retry.
+    if succeeds:
+        assert state['container'] == 'replacement'
+        assert probes == ['kill:before', 'kill:after']
+        assert requests == ['inflight', 'kill:before']  # Interrupted ask never replayed.
+        assert any(r['kind'] == 'old_epoch_probe' and r['result']['http'] == 409 for r in rows)
+        assert any(r['kind'] == 'fault_end' and r['status'] == 'passed' for r in rows)
+    else:
+        assert not any(r['kind'] == 'fault_end' for r in rows)
+    receipt = json.loads(next((tmp_path / 'receipts').glob('*.json')).read_text())
+    assert receipt['status'] == ('passed' if succeeds else 'failed')
+    if succeeds:
+        assert receipt['readiness']['epoch'] == 'after'
+        assert next(r for r in rows if r['kind'] == 'kill_recovery')['status'] == 'passed'
