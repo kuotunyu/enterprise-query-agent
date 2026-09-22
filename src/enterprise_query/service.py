@@ -109,7 +109,7 @@ class Service:
                 if t.cancelled: return self._stamp(envelope('rejected','任務已取消；請建立新任務。'),r,t)
                 if t.calls>=3: return self._stamp(envelope('rejected','已達每任務 3 次規劃呼叫上限；請建立新任務。'),r,t)
                 remaining=self.processing_timeout-t.active
-                if remaining<=0: return self._stamp(envelope('timeout','任務已達 60 秒實際處理上限。'),r,t)
+                if remaining<=0: return self._stamp(envelope('timeout',f'任務已達 {self.processing_timeout:g} 秒實際處理上限。'),r,t)
                 async with asyncio.timeout(remaining):
                     # Waiting for a provider slot is cancellable; no thread is queued yet.
                     queued=time.perf_counter()
