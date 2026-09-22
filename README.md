@@ -105,7 +105,7 @@ $env:EQA_WEB_URL = "http://127.0.0.1:8011"
 uv run --env-file .local/runtime.env pytest -q
 ```
 
-缺少 MySQL／Web 的測試會明示 skip，不算 pass。CI 分成離線與 MySQL 兩個 job；v1.0.0 發布時為離線 114 項、MySQL 143 項通過。開發過程中保留的失敗與修正見 [工程驗證紀錄](reports/engineering.md)。
+缺少 MySQL／Web 的測試會明示 skip，不算 pass。CI 分成離線與 MySQL 兩個 job；v1.0.0 發布時為離線 114 項、MySQL 143 項通過。開發過程中保留的失敗與修正見 [工程驗證紀錄](reports/engineering.md)。本機 Docker 堆疊的負載、故障注入與 24 小時 soak 量測結果見 [營運實驗報告](reports/ops-lab-2026-09.md)。
 
 ## 資料來源與授權
 
@@ -116,3 +116,4 @@ uv run --env-file .local/runtime.env pytest -q
 - [正式報告：三種做法的一次比較](reports/formal-luna.md)
 - [操作細節：設定檔、連接埠、真資料、真模型與費用帳本](docs/operations.md)
 - [工程驗證紀錄](reports/engineering.md)
+- [本機營運實驗：負載、故障注入與 24 小時 soak 結果](reports/ops-lab-2026-09.md)

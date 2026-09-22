@@ -252,17 +252,20 @@ No ask retries or automatic replay occur, including after HTTP timeouts.
 An interrupted/unknown request remains unknown. `summarize` writes a new file
 each time and can recover complete JSONL records from a truncated final line.
 
-Full experiments, **only after task and whole-branch review**, use:
+Full experiments, **only after the whole branch has been reviewed**, use
+(replace the example stack name and receipt placeholders with the validated
+stack and its exact successful build receipts):
 
 ```console
-uv run --locked python scripts/ops_measure.py load eqaops-task2-c --runtime-receipt .local/ops/builds/20260920T131651-build-runtime-395434de.json
-uv run --locked python scripts/ops_measure.py faults eqaops-task2-c --runtime-receipt .local/ops/builds/20260920T131651-build-runtime-395434de.json --bad-receipt .local/ops/builds/20260920T131813-build-unready-63089bbe.json
-uv run --locked python scripts/ops_measure.py soak eqaops-task2-c --runtime-receipt .local/ops/builds/20260920T131651-build-runtime-395434de.json
+uv run --locked python scripts/ops_measure.py load eqaops-run-a --runtime-receipt .local/ops/builds/<runtime-receipt>.json
+uv run --locked python scripts/ops_measure.py faults eqaops-run-a --runtime-receipt .local/ops/builds/<runtime-receipt>.json --bad-receipt .local/ops/builds/<unready-receipt>.json
+uv run --locked python scripts/ops_measure.py soak eqaops-run-a --runtime-receipt .local/ops/builds/<runtime-receipt>.json
 uv run --locked python scripts/ops_measure.py summarize .local/ops/runs/<run-id>
 ```
 
-These receipts belong to the existing local C stack. On another machine,
-substitute that machine's validated stack and exact successful image receipts.
+The runtime receipt must be the successful `build` receipt the stack was
+deployed from, and the unready receipt the matching `build --target unready`
+receipt; on another machine, use that machine's own validated stack and receipts.
 Changing only the host harness does not require rebuilding the measured image.
 Do not change the runtime/database/fixture/config during a full experiment.
 
@@ -369,9 +372,10 @@ failed; v2 never retrospectively reclassifies that run.
 HTTP cancellation here observes deterministic provider delay, **not** long SQL
 cancellation. Separate real-MySQL evidence is the existing
 `tests/test_executor_layers.py::test_explicit_cancel_stops_real_query` and
-`test_default_five_second_deadline_and_no_residual`, recorded by Task 2's
-integration verification. Ordinary compiled synthetic queries are too short
-to make an HTTP-triggered long-SQL cleanup claim.
+`test_default_five_second_deadline_and_no_residual`, recorded by the
+integration-marked executor tests that `ops_deploy.py verify` runs. Ordinary
+compiled synthetic queries are too short to make an HTTP-triggered long-SQL
+cleanup claim.
 
 `soak` defaults to a genuine 86,400-second window with one newly created
 synthetic session every 60 seconds (1,440 offered events). The runner waits
@@ -380,12 +384,12 @@ final cache/resource/drain evidence. Sampling records gaps that may indicate
 host sleep, suspension or scheduler delays; wall-clock duration alone cannot
 establish continuous operation. Review missing arrivals, readiness, gaps and
 epoch changes before claiming continuity. The abbreviated diagnostics below
-are never 24-hour evidence. Full load/fault/soak evidence remains pending until
-the controller runs the reviewed package for the prescribed durations.
+are never 24-hour evidence. The completed full load, fault and 24-hour soak
+results are published in [`reports/ops-lab-2026-09.md`](../reports/ops-lab-2026-09.md).
 
 ```console
-uv run --locked python scripts/ops_measure.py smoke eqaops-task2-c --runtime-receipt .local/ops/builds/20260920T131651-build-runtime-395434de.json
-uv run --locked python scripts/ops_measure.py load eqaops-task2-c --runtime-receipt .local/ops/builds/20260920T131651-build-runtime-395434de.json --diagnostic --rates 2 --duration 6 --repeats 1
-uv run --locked python scripts/ops_measure.py faults eqaops-task2-c --runtime-receipt .local/ops/builds/20260920T131651-build-runtime-395434de.json --bad-receipt .local/ops/builds/20260920T131813-build-unready-63089bbe.json --diagnostic --repeats 1
-uv run --locked python scripts/ops_measure.py soak eqaops-task2-c --runtime-receipt .local/ops/builds/20260920T131651-build-runtime-395434de.json --diagnostic --duration 8 --interval 2
+uv run --locked python scripts/ops_measure.py smoke eqaops-run-a --runtime-receipt .local/ops/builds/<runtime-receipt>.json
+uv run --locked python scripts/ops_measure.py load eqaops-run-a --runtime-receipt .local/ops/builds/<runtime-receipt>.json --diagnostic --rates 2 --duration 6 --repeats 1
+uv run --locked python scripts/ops_measure.py faults eqaops-run-a --runtime-receipt .local/ops/builds/<runtime-receipt>.json --bad-receipt .local/ops/builds/<unready-receipt>.json --diagnostic --repeats 1
+uv run --locked python scripts/ops_measure.py soak eqaops-run-a --runtime-receipt .local/ops/builds/<runtime-receipt>.json --diagnostic --duration 8 --interval 2
 ```
