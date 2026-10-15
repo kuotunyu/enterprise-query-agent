@@ -23,8 +23,83 @@ class PolicyError(ValueError):
     pass
 
 
+# MySQL ends the '--' opener on whitespace or a control character; anything else
+# makes the two dashes arithmetic. SQLGlot opens a comment either way.
+AFTER_DASHES = ' \t\n\r\f\v\0'
+
+
+def _skip_line(sql, i):
+    ends = [p for p in (sql.find('\n', i), sql.find('\r', i)) if p >= 0]
+    return min(ends) if ends else len(sql)
+
+
+def _skip_quoted(sql, i, escapes):
+    quote = sql[i]
+    j = i+1
+    while j < len(sql):
+        if escapes and sql[j] == '\\':
+            j += 2
+            continue
+        if sql[j] == quote:
+            # A doubled delimiter is an escaped delimiter, not the end.
+            if sql[j+1:j+2] == quote:
+                j += 2
+                continue
+            return j+1
+        j += 1
+    raise PolicyError('unterminated quoted string or identifier')
+
+
+def _scan(sql, escapes):
+    """Reject executable comments and ambiguous '--' found outside quoted text.
+
+    This reads the statement with MySQL's lexer rules rather than SQLGlot's,
+    because check_sql returns the caller's bytes and executor.execute sends
+    them: anything SQLGlot drops or re-reads differently still reaches the
+    server. SQLGlot discards /*! and /*+ bodies in several positions, so the
+    AST comment check alone cannot see them.
+    """
+    i = 0
+    while i < len(sql):
+        c = sql[i]
+        if sql.startswith('/*', i):
+            if sql.startswith('/*!', i) or sql.startswith('/*+', i):
+                raise PolicyError('executable comment or optimizer hint not allowed')
+            end = sql.find('*/', i+2)
+            if end < 0:
+                raise PolicyError('unterminated block comment')
+            i = end+2
+        elif sql.startswith('--', i):
+            after = sql[i+2:i+3]
+            # Empty means end of statement, where execute appends a newline.
+            if after and after not in AFTER_DASHES:
+                raise PolicyError("'--' is only a comment when followed by whitespace")
+            i = _skip_line(sql, i+2)
+        elif c == '#':
+            i = _skip_line(sql, i+1)
+        elif c in '\'"`':
+            # Backslash is never an escape inside a backtick identifier.
+            i = _skip_quoted(sql, i, escapes and c != '`')
+        else:
+            i += 1
+
+
+def check_lexical(sql: str) -> None:
+    """Fail closed whichever way the server treats backslashes.
+
+    sql_mode is not part of the verified identity contract (executor._identity
+    checks database, user, version, grants and data version only), so
+    NO_BACKSLASH_ESCAPES cannot be assumed off. Scan under both readings and
+    keep the stricter verdict. ANSI_QUOTES changes what a double-quoted region
+    means, not where it ends, so one scan covers that too.
+    """
+    for escapes in (True, False):
+        _scan(sql, escapes)
+
+
 def check_sql(sql: str) -> str:
     try:
+        check_lexical(sql)
         # Compiler/driver use %s, parser accepts placeholders as '?'. Values are never interpolated here.
         parsed = sqlglot.parse(sql.replace('%s', '?'), read='mysql')
         if len(parsed) != 1 or not isinstance(parsed[0], exp.Select):
