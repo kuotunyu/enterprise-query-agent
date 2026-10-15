@@ -8,11 +8,14 @@ and SQLGlot opens a comment at '--' unconditionally, while MySQL needs
 whitespace or a control character after the second dash.
 
 This guard closes those two token families. It does not claim to close every
-SQLGlot/MySQL parser differential, and it is not free: NARROWED_BY_DUAL_SCAN
+SQLGlot/MySQL parser differential, and it is not free: NARROWED_BY_ESCAPE_MODES
 below records valid SQL that was accepted before the guard and is refused now.
+
+Nothing here was executed against MySQL. The lexer rules relied on are the
+documented ones; no live validation is claimed.
 """
 import pytest
-from enterprise_query.sql_policy import check_sql, check_lexical, PolicyError
+from enterprise_query.sql_policy import check_sql, check_lexical, _scan, ESCAPE_MODES, PolicyError
 from enterprise_query.compiler import compile_plan
 from enterprise_query.contracts import QueryPlan
 
@@ -45,8 +48,11 @@ MALFORMED = [
 
 # Must keep being accepted. Quoted text is data, not syntax: a comment marker
 # inside a literal, an identifier or another comment is just characters. Every
-# row here was verified accepted by check_sql before the guard as well; for the
-# quoted SQL the guard does NOT preserve, see NARROWED_BY_DUAL_SCAN.
+# row here was verified accepted by the GUARD before and after; two of them -
+# the AST_STRICTER_THAN_MYSQL pair below - are refused by the pre-existing AST
+# comment check, at baseline and now, so they are excluded from the
+# full-policy corpus. For quoted SQL the guard does NOT preserve, see
+# NARROWED_BY_ESCAPE_MODES.
 MUST_KEEP = [
     ('bound parameter', 'SELECT order_id FROM orders WHERE order_status = %s'),
     ('two parameters', 'SELECT order_id FROM orders WHERE order_purchase_timestamp >= %s AND order_purchase_timestamp < %s'),
@@ -148,24 +154,74 @@ def test_inert_comment_text_is_allowed_by_guard_but_refused_by_ast_check(sql):
 
 
 # The guard is conservative, and that costs real SQL. sql_mode is not verified
-# by executor._identity, so check_lexical scans under both backslash readings
-# and keeps the stricter verdict. These statements are valid under default
-# sql_mode and WERE accepted before the guard; they are refused now because the
-# NO_BACKSLASH_ESCAPES reading sees the string as unterminated. Recorded rather
+# by executor._identity, so check_lexical scans every reachable escaping mode
+# and keeps the strictest verdict. These statements are valid under default
+# sql_mode and WERE accepted before the guard; they are refused now because a
+# no-backslash-escape reading sees the string as unterminated. Recorded rather
 # than claimed away: the guard does not preserve all previously accepted
-# quoted SQL. Doubling the backslash (an accepted row above) avoids it.
-NARROWED_BY_DUAL_SCAN = [
+# quoted SQL.
+#
+# Repair is NOT doubling the backslash: 'a\\b' is the string a\b, a different
+# value from 'a\'b' (which is a'b). Use a bound parameter, or double the quote
+# delimiter being embedded - 'a''b' and "a""b" are the same values and are
+# accepted (see MUST_KEEP).
+NARROWED_BY_ESCAPE_MODES = [
     ('backslash-escaped single quote', "SELECT order_id FROM orders WHERE order_status = 'a\\'b'"),
     ('backslash-escaped double quote', 'SELECT order_id FROM orders WHERE order_status = "a\\"b"'),
 ]
 
 
-@pytest.mark.parametrize('label,sql', NARROWED_BY_DUAL_SCAN, ids=[label for label, _ in NARROWED_BY_DUAL_SCAN])
-def test_backslash_escaped_quotes_are_refused_by_the_dual_scan(label, sql):
+@pytest.mark.parametrize('label,sql', NARROWED_BY_ESCAPE_MODES,
+                         ids=[label for label, _ in NARROWED_BY_ESCAPE_MODES])
+def test_backslash_escaped_quotes_are_refused_by_the_escape_mode_scan(label, sql):
     with pytest.raises(PolicyError, match='unterminated'):
         check_lexical(sql)
     with pytest.raises(PolicyError, match='unterminated'):
         check_sql(sql)
+
+
+@pytest.mark.parametrize('label,repaired', [
+    ('bound parameter', 'SELECT order_id FROM orders WHERE order_status = %s'),
+    ('doubled single quote delimiter', "SELECT order_id FROM orders WHERE order_status = 'a''b'"),
+    ('doubled double quote delimiter', 'SELECT order_id FROM orders WHERE order_status = "a""b"'),
+])
+def test_recommended_repairs_for_an_embedded_quote_are_accepted(label, repaired):
+    assert check_sql(repaired) == repaired
+
+
+# ANSI_QUOTES and NO_BACKSLASH_ESCAPES move quoted-region ENDINGS independently
+# per quote character, so the guard scans each reachable combination. This
+# statement proves the mixed combination is not dead code: under ANSI_QUOTES
+# with backslash escapes still active for single quotes the final region really
+# is unterminated, and that reading is the ONLY one that sees it.
+#
+# Scope of what this proves, stated precisely: the mixed pass is live at the
+# scanner level. It is NOT an end-to-end bypass that the other two passes would
+# have let through - at 9059fe7 the AST stage already refused this statement,
+# with 'function not allowed: CONCAT', because SQLGlot reads the adjacent
+# literals as implicit concatenation. The mixed pass is here because sql_mode
+# is unpinned and the guard must fail closed under every reachable reading,
+# not because a reachable end-to-end payload has been demonstrated for it.
+MIXED_MODE_ONLY = 'SELECT order_id FROM orders WHERE order_status = ' + '\'\\\'\'"\'\\""'
+
+
+def test_mixed_escaping_mode_is_the_only_pass_that_catches_this():
+    assert ESCAPE_MODES == ((True, True), (True, False), (False, False)), \
+        '(False, True) is not a reachable sql_mode; the other three must all be scanned'
+    _scan(MIXED_MODE_ONLY, True, True)      # default mode: terminated
+    _scan(MIXED_MODE_ONLY, False, False)    # NO_BACKSLASH_ESCAPES: terminated
+    with pytest.raises(PolicyError, match='unterminated'):
+        _scan(MIXED_MODE_ONLY, True, False)  # ANSI_QUOTES + backslash escapes
+    with pytest.raises(PolicyError, match='unterminated'):
+        check_lexical(MIXED_MODE_ONLY)
+
+
+def test_backticks_never_take_backslash_escapes_in_any_mode():
+    sql = 'SELECT order_id AS `a\\` FROM orders'
+    for sq_escapes, dq_escapes in ESCAPE_MODES:
+        # The backtick closes after the backslash in every mode, leaving the
+        # rest of the statement outside quotes, so no mode hides anything here.
+        _scan(sql, sq_escapes, dq_escapes)
 
 
 def test_compiler_shapes_still_pass_the_whole_policy():

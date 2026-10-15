@@ -50,7 +50,7 @@ def _skip_quoted(sql, i, escapes):
     raise PolicyError('unterminated quoted string or identifier')
 
 
-def _scan(sql, escapes):
+def _scan(sql, sq_escapes, dq_escapes):
     """Reject executable comments and ambiguous '--' found outside quoted text.
 
     This reads the statement with MySQL's lexer rules rather than SQLGlot's,
@@ -78,15 +78,26 @@ def _scan(sql, escapes):
         elif c == '#':
             i = _skip_line(sql, i+1)
         elif c in '\'"`':
-            # Backslash is never an escape inside a backtick identifier. For '"'
-            # it depends on sql_mode, which check_lexical covers by scanning twice.
-            i = _skip_quoted(sql, i, escapes and c != '`')
+            # Escaping is per quote character: backslash is never an escape inside
+            # a backtick identifier, and under ANSI_QUOTES a double-quoted region
+            # is an identifier too. check_lexical supplies each combination.
+            i = _skip_quoted(sql, i, {'\'': sq_escapes, '"': dq_escapes, '`': False}[c])
         else:
             i += 1
 
 
+# (single-quote escapes, double-quote escapes) per reachable sql_mode. Backticks
+# never take backslash escapes, in any mode.
+#   (True,  True )  default: backslash escapes, '"' is a string
+#   (True,  False)  ANSI_QUOTES: backslash escapes, '"' is an identifier
+#   (False, False)  NO_BACKSLASH_ESCAPES, with or without ANSI_QUOTES
+# (False, True) is omitted: no mode disables backslash escapes for "'" while
+# leaving them active for '"'.
+ESCAPE_MODES = ((True, True), (True, False), (False, False))
+
+
 def check_lexical(sql: str) -> None:
-    """Fail closed whichever way the server treats backslashes.
+    """Fail closed under every sql_mode the server could be running.
 
     sql_mode is not part of the verified identity contract (executor._identity
     checks database, user, version, grants and data version only), so neither
@@ -94,20 +105,19 @@ def check_lexical(sql: str) -> None:
     a quoted region ENDS, not merely what it means: with backslash escapes,
     'a\\'b' is one string, and without them it is the string 'a\\' followed by
     b'. ANSI_QUOTES makes a double-quoted region an identifier, where backslash
-    is not an escape, so its ending moves the same way.
+    is not an escape, so its ending moves the same way - and independently of
+    the single-quote reading, which is why escaping is modelled per quote
+    character rather than with one flag for both.
 
-    Scanning twice and keeping the stricter verdict is the protection, not any
-    claim that the readings agree. The cost is that a backslash-escaped quote,
-    valid under default sql_mode, is refused because the other reading sees it
-    as unterminated; tests/test_sql_lexical_guard.py records those rows.
-
-    Known gap, deliberately not widened here: the two passes model the uniform
-    readings. A mixed sql_mode (ANSI_QUOTES on while backslash escapes still
-    apply to single quotes) is not separately modelled, and no claim is made
-    about it.
+    Scanning every reachable combination and keeping the strictest verdict is
+    the protection; there is no invariance to appeal to. The cost is that a
+    backslash-escaped quote, valid under default sql_mode, is refused because
+    another reading sees the string as unterminated. Repair such a statement
+    with a bound parameter, or by doubling the quote delimiter it embeds -
+    tests/test_sql_lexical_guard.py records those rows.
     """
-    for escapes in (True, False):
-        _scan(sql, escapes)
+    for sq_escapes, dq_escapes in ESCAPE_MODES:
+        _scan(sql, sq_escapes, dq_escapes)
 
 
 def check_sql(sql: str) -> str:
