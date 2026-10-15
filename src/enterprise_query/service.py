@@ -87,8 +87,11 @@ class Service:
                     return AnswerEnvelope(status='rejected',message='此修訂已過期。',request_id=key,session_id=request.session_id,revision=request.revision)
                 if request.revision > task.revision:
                     if task.executor is not None:
-                        if self.observer is None: task.executor.cancel()
-                        else: await self.run_worker(key,'cancel_seconds',task.executor.cancel)
+                        # Executor.cancel does blocking socket work (connect, KILL
+                        # CONNECTION, SHOW PROCESSLIST poll); never on the loop thread.
+                        # self.guard is still held across this await: other sessions
+                        # queue, but the loop keeps serving.
+                        await self.run_worker(key,'cancel_seconds',task.executor.cancel)
                     task.revision=request.revision
                 future=asyncio.create_task(self._run(request,task))
                 self.requests[key]=future
@@ -176,8 +179,7 @@ class Service:
             except (TimeoutError, asyncio.TimeoutError):
                 if t.attempts and t.attempts[-1]['status']=='started': t.attempts[-1].update(status='timeout',error_type='TimeoutError')
                 if t.executor is not None:
-                    if self.observer is None: t.executor.cancel()
-                    else: await self.run_worker(r.request_id,'cancel_seconds',t.executor.cancel)
+                    await self.run_worker(r.request_id,'cancel_seconds',t.executor.cancel)
                 answer=envelope('timeout','查詢或任務超時，已要求資料庫停止執行。')
             except Exception as exc:
                 # Do not leak connection strings, filesystem paths or provider traces.
