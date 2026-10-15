@@ -8,7 +8,8 @@ and SQLGlot opens a comment at '--' unconditionally, while MySQL needs
 whitespace or a control character after the second dash.
 
 This guard closes those two token families. It does not claim to close every
-SQLGlot/MySQL parser differential.
+SQLGlot/MySQL parser differential, and it is not free: NARROWED_BY_DUAL_SCAN
+below records valid SQL that was accepted before the guard and is refused now.
 """
 import pytest
 from enterprise_query.sql_policy import check_sql, check_lexical, PolicyError
@@ -43,7 +44,9 @@ MALFORMED = [
 ]
 
 # Must keep being accepted. Quoted text is data, not syntax: a comment marker
-# inside a literal, an identifier or another comment is just characters.
+# inside a literal, an identifier or another comment is just characters. Every
+# row here was verified accepted by check_sql before the guard as well; for the
+# quoted SQL the guard does NOT preserve, see NARROWED_BY_DUAL_SCAN.
 MUST_KEEP = [
     ('bound parameter', 'SELECT order_id FROM orders WHERE order_status = %s'),
     ('two parameters', 'SELECT order_id FROM orders WHERE order_purchase_timestamp >= %s AND order_purchase_timestamp < %s'),
@@ -52,6 +55,12 @@ MUST_KEEP = [
     ('single-quoted string holding /*!', "SELECT order_id FROM orders WHERE order_status = '/*!80400 x */'"),
     ('single-quoted string holding /*+', "SELECT order_id FROM orders WHERE order_status = '/*+ BKA() */'"),
     ('doubled single quote then --', "SELECT order_id FROM orders WHERE order_status = 'it''s --x'"),
+    ('double-quoted text holding --', 'SELECT order_id FROM orders WHERE order_status = "a--b"'),
+    ('double-quoted text holding /*!', 'SELECT order_id FROM orders WHERE order_status = "/*!80400 x */"'),
+    ('double-quoted text holding /*+', 'SELECT order_id FROM orders WHERE order_status = "/*+ BKA() */"'),
+    ('doubled double quote', 'SELECT order_id FROM orders WHERE order_status = "a""b"'),
+    ('doubled double quote then --', 'SELECT order_id FROM orders WHERE order_status = "a""b--c"'),
+    ('double-quoted alias holding --', 'SELECT order_id AS "a--b" FROM orders'),
     ('backtick identifier holding --', 'SELECT order_id AS `a--b` FROM orders'),
     ('doubled backtick identifier', 'SELECT order_id AS `a``b` FROM orders'),
     ('escaped backslash before quote', "SELECT order_id FROM orders WHERE order_status = 'a\\\\b'"),
@@ -100,13 +109,6 @@ def test_ambiguous_dashes_and_their_mysql_equivalent_agree():
             check_sql(sql)
 
 
-@pytest.mark.parametrize('label,sql', MUST_KEEP, ids=[label for label, _ in MUST_KEEP])
-def test_guard_keeps_accepted_sql_byte_for_byte(label, sql):
-    # The guard alone. Two rows below are rejected by the pre-existing AST
-    # comment check rather than by the guard; see the next test.
-    assert check_lexical(sql) is None
-
-
 # Recorded, not changed: the AST comment check predates this guard and is
 # stricter than MySQL. MySQL does not nest block comments, so a /*! sitting
 # inside an already-open comment is inert text, but the AST check sees '!' in
@@ -117,11 +119,52 @@ AST_STRICTER_THAN_MYSQL = [
     'SELECT order_id FROM orders -- /*! inner */',
 ]
 
+FULL_POLICY_KEEP = [(label, sql) for label, sql in MUST_KEEP if sql not in AST_STRICTER_THAN_MYSQL]
+
+
+@pytest.mark.parametrize('label,sql', MUST_KEEP, ids=[label for label, _ in MUST_KEEP])
+def test_guard_accepts_every_must_keep_row(label, sql):
+    """The guard in isolation, including the two AST_STRICTER_THAN_MYSQL rows."""
+    assert check_lexical(sql) is None
+
+
+@pytest.mark.parametrize('label,sql', FULL_POLICY_KEEP, ids=[label for label, _ in FULL_POLICY_KEEP])
+def test_full_policy_accepts_and_returns_identical_bytes(label, sql):
+    """The whole policy, not just the guard, and the statement comes back as is.
+
+    check_sql's return value is what executor.execute concatenates, so byte
+    preservation is the property that matters here. The two rows excluded from
+    this corpus are refused by the pre-existing AST comment check, documented
+    in the next test; no other baseline rejection was found in this corpus.
+    """
+    assert check_sql(sql) == sql
+
 
 @pytest.mark.parametrize('sql', AST_STRICTER_THAN_MYSQL)
 def test_inert_comment_text_is_allowed_by_guard_but_refused_by_ast_check(sql):
     assert check_lexical(sql) is None
     with pytest.raises(PolicyError):
+        check_sql(sql)
+
+
+# The guard is conservative, and that costs real SQL. sql_mode is not verified
+# by executor._identity, so check_lexical scans under both backslash readings
+# and keeps the stricter verdict. These statements are valid under default
+# sql_mode and WERE accepted before the guard; they are refused now because the
+# NO_BACKSLASH_ESCAPES reading sees the string as unterminated. Recorded rather
+# than claimed away: the guard does not preserve all previously accepted
+# quoted SQL. Doubling the backslash (an accepted row above) avoids it.
+NARROWED_BY_DUAL_SCAN = [
+    ('backslash-escaped single quote', "SELECT order_id FROM orders WHERE order_status = 'a\\'b'"),
+    ('backslash-escaped double quote', 'SELECT order_id FROM orders WHERE order_status = "a\\"b"'),
+]
+
+
+@pytest.mark.parametrize('label,sql', NARROWED_BY_DUAL_SCAN, ids=[label for label, _ in NARROWED_BY_DUAL_SCAN])
+def test_backslash_escaped_quotes_are_refused_by_the_dual_scan(label, sql):
+    with pytest.raises(PolicyError, match='unterminated'):
+        check_lexical(sql)
+    with pytest.raises(PolicyError, match='unterminated'):
         check_sql(sql)
 
 

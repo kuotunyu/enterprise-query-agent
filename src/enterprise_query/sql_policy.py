@@ -78,7 +78,8 @@ def _scan(sql, escapes):
         elif c == '#':
             i = _skip_line(sql, i+1)
         elif c in '\'"`':
-            # Backslash is never an escape inside a backtick identifier.
+            # Backslash is never an escape inside a backtick identifier. For '"'
+            # it depends on sql_mode, which check_lexical covers by scanning twice.
             i = _skip_quoted(sql, i, escapes and c != '`')
         else:
             i += 1
@@ -88,10 +89,22 @@ def check_lexical(sql: str) -> None:
     """Fail closed whichever way the server treats backslashes.
 
     sql_mode is not part of the verified identity contract (executor._identity
-    checks database, user, version, grants and data version only), so
-    NO_BACKSLASH_ESCAPES cannot be assumed off. Scan under both readings and
-    keep the stricter verdict. ANSI_QUOTES changes what a double-quoted region
-    means, not where it ends, so one scan covers that too.
+    checks database, user, version, grants and data version only), so neither
+    NO_BACKSLASH_ESCAPES nor ANSI_QUOTES can be assumed off. Both change where
+    a quoted region ENDS, not merely what it means: with backslash escapes,
+    'a\\'b' is one string, and without them it is the string 'a\\' followed by
+    b'. ANSI_QUOTES makes a double-quoted region an identifier, where backslash
+    is not an escape, so its ending moves the same way.
+
+    Scanning twice and keeping the stricter verdict is the protection, not any
+    claim that the readings agree. The cost is that a backslash-escaped quote,
+    valid under default sql_mode, is refused because the other reading sees it
+    as unterminated; tests/test_sql_lexical_guard.py records those rows.
+
+    Known gap, deliberately not widened here: the two passes model the uniform
+    readings. A mixed sql_mode (ANSI_QUOTES on while backslash escapes still
+    apply to single quotes) is not separately modelled, and no claim is made
+    about it.
     """
     for escapes in (True, False):
         _scan(sql, escapes)
